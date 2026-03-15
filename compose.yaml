@@ -25,7 +25,7 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - PIPER_URL=http://tts-engine:5000
+      - PIPER_URL=http://tts-engine:10200
       - RSS_URL=http://feeds.bbci.co.uk/news/rss.xml
       - POLL_INTERVAL=0 * * * *
       - MAX_AUDIO_FILES=50
@@ -36,10 +36,18 @@ services:
     command: ["npm", "run", "start:worker"]
 
   tts-engine:
-    image: rhasspy/piper:latest
+    image: lscr.io/linuxserver/piper:latest
 #    ports:
-#      - "5000:5000"
-    command: ["--model", "en_US-lessac-medium"]
-    # For natural Spanish voices, use:
-    # command: ["--model", "es_ES-sharvard-medium"]
-    # For a list of models: https://github.com/rhasspy/piper/releases/tag/v0.0.2
+#      - 10200:10200
+    container_name: piper
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PIPER_VOICE=en_US-lessac-medium # For natural Spanish voices, use "es_ES-sharvard-medium"
+      - LOCAL_ONLY= #optional
+      - PIPER_LENGTH=1.0 #optional
+      - PIPER_NOISE=0.667 #optional
+      - PIPER_NOISEW=0.333 #optional
+      - PIPER_SPEAKER=0 #optional
+      - NO_STREAMING= #optional
