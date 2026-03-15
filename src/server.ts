@@ -26,16 +26,19 @@ app.get('/rss', (req, res) => {
   const siteUrl = `${req.protocol}://${req.get('host')}`
 
   const podcast = new Podcast({
-    title: 'RSS to Podcast',
-    description: 'Automatically generated podcast from RSS feeds',
+    title: process.env.PODCAST_TITLE || 'RSS to Podcast',
+    description: process.env.PODCAST_DESCRIPTION || 'Automatically generated podcast from RSS feeds',
     feedUrl: feedUrl,
     siteUrl: siteUrl,
-    author: 'RSS to Podcast Worker',
-    language: 'en',
-    itunesAuthor: 'RSS to Podcast Worker',
-    itunesSummary: 'Automatically generated podcast from RSS feeds',
-    itunesOwner: { name: 'RSS to Podcast Worker', email: 'worker@example.com' },
-    itunesCategory: [{ text: 'Technology' }],
+    author: process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker',
+    language: process.env.PODCAST_LANGUAGE || 'en',
+    itunesAuthor: process.env.PODCAST_ITUNES_AUTHOR || process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker',
+    itunesSummary: process.env.PODCAST_ITUNES_SUMMARY || process.env.PODCAST_DESCRIPTION || 'Automatically generated podcast from RSS feeds',
+    itunesOwner: { 
+      name: process.env.PODCAST_ITUNES_OWNER_NAME || process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker', 
+      email: process.env.PODCAST_ITUNES_OWNER_EMAIL || 'worker@example.com' 
+    },
+    itunesCategory: [{ text: process.env.PODCAST_ITUNES_CATEGORY || 'Technology' }],
   })
 
   const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL ORDER BY pub_date DESC').all() as Article[]
