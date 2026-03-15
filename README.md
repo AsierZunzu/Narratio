@@ -30,7 +30,7 @@ RSS-to-Podcast is a TypeScript-based application that periodically fetches artic
 The application can be configured using environment variables. Default values are provided in `compose.yaml`.
 
 ### Worker Configuration
-- `RSS_URLS`: Comma-separated list of RSS feed URLs to parse.
+- `RSS_URL`: The RSS feed URL to parse.
 - `PIPER_URL`: URL of the Piper TTS engine (e.g., `http://tts-engine:5000`).
 
 ### Server Configuration
