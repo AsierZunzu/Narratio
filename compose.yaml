@@ -26,6 +26,8 @@ services:
       - NODE_ENV=production
       - PIPER_URL=http://tts-engine:5000
       - RSS_URL=http://feeds.bbci.co.uk/news/rss.xml
+      - MAX_AUDIO_FILES=50
+      - MAX_AUDIO_SIZE_MB=500
     depends_on:
       - tts-engine
     # Example usage (can still override via CLI):
