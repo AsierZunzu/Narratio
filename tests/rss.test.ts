@@ -2,16 +2,25 @@ import { parseRSSFeeds } from '../src/rss'
 import Parser from 'rss-parser'
 
 jest.mock('rss-parser')
+jest.mock('../src/tts', () => ({
+  textToAudio: jest.fn().mockResolvedValue('/app/data/audio/test.wav')
+}))
 
 describe('RSS Parsing', () => {
   let mockDb: any
   let mockParser: any
+  let insertMock: any
+  let updateMock: any
 
   beforeEach(() => {
     jest.clearAllMocks()
+    insertMock = { run: jest.fn() }
+    updateMock = { run: jest.fn() }
     mockDb = {
-      prepare: jest.fn().mockReturnValue({
-        run: jest.fn()
+      prepare: jest.fn().mockImplementation((query) => {
+        if (query.includes('INSERT')) return insertMock
+        if (query.includes('UPDATE')) return updateMock
+        return { run: jest.fn() }
       })
     }
     mockParser = {
@@ -45,10 +54,12 @@ describe('RSS Parsing', () => {
     await parseRSSFeeds(['http://test-feed.com'], mockDb, mockParser as any)
 
     expect(mockParser.parseURL).toHaveBeenCalledWith('http://test-feed.com')
-    expect(mockDb.prepare).toHaveBeenCalled()
-    expect(mockDb.prepare().run).toHaveBeenCalledTimes(2)
-    expect(mockDb.prepare().run).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1')
-    expect(mockDb.prepare().run).toHaveBeenCalledWith('2', 'Article 2', 'http://example.com/2', '2023-01-02', 'Content 2')
+    expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT'))
+    expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE'))
+    expect(insertMock.run).toHaveBeenCalledTimes(2)
+    expect(updateMock.run).toHaveBeenCalledTimes(2)
+    expect(insertMock.run).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1')
+    expect(updateMock.run).toHaveBeenCalledWith('/app/data/audio/test.wav', expect.any(String), '1')
   })
 
   test('should handle existing articles without crashing', async () => {
@@ -58,17 +69,16 @@ describe('RSS Parsing', () => {
     }
     mockParser.parseURL.mockResolvedValue(mockFeed)
     
-    const runMock = jest.fn().mockImplementation(() => {
+    insertMock.run.mockImplementation(() => {
       const err: any = new Error('Constraint failed')
       err.code = 'SQLITE_CONSTRAINT_PRIMARYKEY'
       throw err
     })
-    mockDb.prepare.mockReturnValue({ run: runMock })
 
     await parseRSSFeeds(['http://test-feed.com'], mockDb, mockParser as any)
 
-    expect(runMock).toHaveBeenCalled()
-    // Should not throw
+    expect(insertMock.run).toHaveBeenCalled()
+    expect(updateMock.run).not.toHaveBeenCalled()
   })
 
   test('should log error when feed parsing fails', async () => {
