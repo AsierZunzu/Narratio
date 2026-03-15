@@ -25,7 +25,7 @@ services:
     environment:
       - NODE_ENV=production
       - PIPER_URL=http://tts-engine:5000
-      - RSS_URLS=http://feeds.bbci.co.uk/news/rss.xml
+      - RSS_URL=http://feeds.bbci.co.uk/news/rss.xml
     depends_on:
       - tts-engine
     # Example usage (can still override via CLI):

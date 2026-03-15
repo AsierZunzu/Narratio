@@ -18,6 +18,11 @@ export function initDatabase(path: string = DB_PATH) {
 
   // Create tables
   db.exec(`
+    CREATE TABLE IF NOT EXISTS metadata (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS articles (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -31,6 +36,11 @@ export function initDatabase(path: string = DB_PATH) {
   `)
 
   return db
+}
+
+export function resetDatabase(dbInstance: Database.Database = db) {
+  dbInstance.exec('DELETE FROM articles')
+  dbInstance.exec('DELETE FROM metadata')
 }
 
 export const db = initDatabase()

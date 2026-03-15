@@ -25,15 +25,18 @@ app.get('/rss', (req, res) => {
   const feedUrl = `${req.protocol}://${req.get('host')}/rss`
   const siteUrl = `${req.protocol}://${req.get('host')}`
 
+  const storedUrlRow = db.prepare("SELECT value FROM metadata WHERE key = 'feed_url'").get() as { value: string } | undefined
+  const defaultDescription = storedUrlRow ? `Automatically generated podcast from ${storedUrlRow.value}` : 'Automatically generated podcast from RSS feeds'
+
   const podcast = new Podcast({
     title: process.env.PODCAST_TITLE || 'RSS to Podcast',
-    description: process.env.PODCAST_DESCRIPTION || 'Automatically generated podcast from RSS feeds',
+    description: process.env.PODCAST_DESCRIPTION || defaultDescription,
     feedUrl: feedUrl,
     siteUrl: siteUrl,
     author: process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker',
     language: process.env.PODCAST_LANGUAGE || 'en',
     itunesAuthor: process.env.PODCAST_ITUNES_AUTHOR || process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker',
-    itunesSummary: process.env.PODCAST_ITUNES_SUMMARY || process.env.PODCAST_DESCRIPTION || 'Automatically generated podcast from RSS feeds',
+    itunesSummary: process.env.PODCAST_ITUNES_SUMMARY || process.env.PODCAST_DESCRIPTION || defaultDescription,
     itunesOwner: { 
       name: process.env.PODCAST_ITUNES_OWNER_NAME || process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker', 
       email: process.env.PODCAST_ITUNES_OWNER_EMAIL || 'worker@example.com' 

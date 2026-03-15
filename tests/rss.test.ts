@@ -1,4 +1,4 @@
-import { parseRSSFeeds } from '../src/rss'
+import { parseRSSFeed } from '../src/rss'
 import Parser from 'rss-parser'
 
 jest.mock('rss-parser')
@@ -51,7 +51,7 @@ describe('RSS Parsing', () => {
 
     mockParser.parseURL.mockResolvedValue(mockFeed)
 
-    await parseRSSFeeds(['http://test-feed.com'], mockDb, mockParser as any)
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(mockParser.parseURL).toHaveBeenCalledWith('http://test-feed.com')
     expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT'))
@@ -75,7 +75,7 @@ describe('RSS Parsing', () => {
       throw err
     })
 
-    await parseRSSFeeds(['http://test-feed.com'], mockDb, mockParser as any)
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(insertMock.run).toHaveBeenCalled()
     expect(updateMock.run).not.toHaveBeenCalled()
@@ -85,7 +85,7 @@ describe('RSS Parsing', () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
     mockParser.parseURL.mockRejectedValue(new Error('Parse error'))
 
-    await parseRSSFeeds(['http://invalid-feed.com'], mockDb, mockParser as any)
+    await parseRSSFeed('http://invalid-feed.com', mockDb, mockParser as any)
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Error parsing feed from http://invalid-feed.com:'), expect.any(Error))
     consoleSpy.mockRestore()
