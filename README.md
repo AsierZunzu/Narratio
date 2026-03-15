@@ -30,15 +30,23 @@ RSS-to-Podcast is a TypeScript-based application that periodically fetches artic
 The application can be configured using environment variables. Default values are provided in `compose.yaml`.
 
 ### Worker Configuration
-- `RSS_URL`: The RSS feed URL to parse.
-- `PIPER_URL`: URL of the Piper TTS engine (e.g., `http://tts-engine:5000`).
+- `RSS_URL`: The RSS feed URL to parse (required).
+- `PIPER_URL`: URL of the Piper TTS engine (default: `http://localhost:5000`).
+- `MAX_AUDIO_FILES`: Maximum number of audio files to keep (default: `Infinity`).
+- `MAX_AUDIO_SIZE_MB`: Maximum total size of audio files in MB (default: `Infinity`).
+- `NODE_ENV`: Set to `production` for optimized execution.
 
 ### Server Configuration
 - `PORT`: The port the web server will listen on (default: `3000`).
-- `PODCAST_TITLE`: Title of your generated podcast.
-- `PODCAST_DESCRIPTION`: Description of your podcast.
-- `PODCAST_AUTHOR`: Author name for the podcast.
-- `PODCAST_LANGUAGE`: Language code (e.g., `en`, `es`).
+- `PODCAST_TITLE`: Title of your generated podcast (default: `RSS to Podcast`).
+- `PODCAST_DESCRIPTION`: Description of your podcast (default: dynamic based on feed URL).
+- `PODCAST_AUTHOR`: Author name for the podcast (default: `RSS to Podcast Worker`).
+- `PODCAST_LANGUAGE`: Language code (default: `en`).
+- `PODCAST_ITUNES_AUTHOR`: iTunes-specific author name (defaults to `PODCAST_AUTHOR`).
+- `PODCAST_ITUNES_SUMMARY`: iTunes-specific summary (defaults to `PODCAST_DESCRIPTION`).
+- `PODCAST_ITUNES_OWNER_NAME`: iTunes-specific owner name (defaults to `PODCAST_AUTHOR`).
+- `PODCAST_ITUNES_OWNER_EMAIL`: iTunes-specific owner email (default: `worker@example.com`).
+- `PODCAST_ITUNES_CATEGORY`: iTunes-specific category (default: `Technology`).
 
 ## Usage
 
