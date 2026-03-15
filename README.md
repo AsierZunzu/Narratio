@@ -31,6 +31,7 @@ The application can be configured using environment variables. Default values ar
 
 ### Worker Configuration
 - `RSS_URL`: The RSS feed URL to parse (required).
+- `POLL_INTERVAL`: Cron expression for periodic polling (e.g., `0 * * * *` for hourly). If not set, the worker runs once and exits.
 - `PIPER_URL`: URL of the Piper TTS engine (default: `http://localhost:5000`).
 - `MAX_AUDIO_FILES`: Maximum number of audio files to keep (default: `Infinity`).
 - `MAX_AUDIO_SIZE_MB`: Maximum total size of audio files in MB (default: `Infinity`).
