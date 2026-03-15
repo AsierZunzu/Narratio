@@ -1,5 +1,9 @@
+# Node
 /node_modules
 
+# Testing
+/coverage/
+
+#App
 dist/
 data/
-/coverage/
