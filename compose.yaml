@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+    # Example usage:
+    command: ["http://feeds.bbci.co.uk/news/rss.xml"]
