@@ -7,7 +7,7 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - PIPER_URL=http://tts-engine:5000
+      - PIPER_URL=http://tts-engine:10200
       - PODCAST_TITLE=RSS to Podcast
       - PODCAST_DESCRIPTION=Automatically generated podcast from RSS feeds
       - PODCAST_AUTHOR=RSS to Podcast Worker
