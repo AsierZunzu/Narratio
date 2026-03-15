@@ -1,22 +1,5 @@
 import { parseRSSFeeds } from './rss'
-
-function isValidURL(url: string): boolean {
-  try {
-    new URL(url)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function checkReachability(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { method: 'HEAD' })
-    return response.ok
-  } catch {
-    return false
-  }
-}
+import { isValidURL, checkReachability } from './utils/url'
 
 async function main() {
   const args = process.argv.slice(2)
