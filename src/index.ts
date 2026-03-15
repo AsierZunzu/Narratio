@@ -1,38 +1,56 @@
-import { db } from './database/db'
+import { parseRSSFeeds } from './rss'
 
-interface Article {
-  id: string;
-  title: string;
-  link: string;
-  pub_date: string;
-  content: string;
-}
-
-function testDatabase() {
-  const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content) VALUES (?, ?, ?, ?, ?)')
-  const select = db.prepare('SELECT * FROM articles WHERE id = ?')
-
-  const testArticle: Article = {
-    id: 'test-1',
-    title: 'Test Article',
-    link: 'https://example.com/test-1',
-    pub_date: new Date().toISOString(),
-    content: 'This is a test article content.'
-  }
-
+function isValidURL(url: string): boolean {
   try {
-    insert.run(testArticle.id, testArticle.title, testArticle.link, testArticle.pub_date, testArticle.content)
-    console.log('Inserted test article')
-  } catch (err) {
-    if (err instanceof Error && (err as { code?: string }).code === 'SQLITE_CONSTRAINT_PRIMARYKEY') {
-      console.log('Test article already exists')
-    } else {
-      throw err
-    }
+    new URL(url)
+    return true
+  } catch {
+    return false
   }
-
-  const result = select.get(testArticle.id) as Article & { audio_path: string | null, processed_at: string | null, created_at: string }
-  console.log('Selected article:', result)
 }
 
-testDatabase()
+async function checkReachability(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2)
+  if (args.length === 0) {
+    console.error('Usage: npm run start -- <rss-url1> <rss-url2> ...')
+    process.exit(1)
+  }
+
+  const urls: string[] = []
+  for (const arg of args) {
+    if (!isValidURL(arg)) {
+      console.warn(`Warning: "${arg}" is not a valid URL. Skipping.`)
+      continue
+    }
+
+    const isReachable = await checkReachability(arg)
+    if (!isReachable) {
+      console.warn(`Warning: "${arg}" is not reachable. Skipping.`)
+      continue
+    }
+
+    urls.push(arg)
+  }
+
+  if (urls.length === 0) {
+    console.error('Error: No valid and reachable URLs provided.')
+    process.exit(1)
+  }
+
+  await parseRSSFeeds(urls)
+  console.log('RSS parsing complete.')
+}
+
+main().catch(err => {
+  console.error('Fatal error:', err)
+  process.exit(1)
+})
