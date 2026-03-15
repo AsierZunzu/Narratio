@@ -4,7 +4,7 @@ import { isValidURL, checkReachability } from './utils/url'
 async function main() {
   const args = process.argv.slice(2)
   if (args.length === 0) {
-    console.error('Usage: npm run start -- <rss-url1> <rss-url2> ...')
+    console.error('Error: No RSS URLs provided.')
     process.exit(1)
   }
 
@@ -34,6 +34,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err)
+  console.error('Fatal error in worker:', err)
   process.exit(1)
 })

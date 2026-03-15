@@ -2,10 +2,12 @@
   "name": "rss-to-podcast",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/server.js",
+    "start:server": "node dist/server.js",
+    "start:worker": "node dist/worker.js",
     "test": "jest",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix"
@@ -13,11 +15,15 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
+    "@types/supertest": "^7.2.0",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
     "eslint": "^10.0.3",
     "jest": "^30.3.0",
+    "podcast": "^2.0.1",
+    "supertest": "^7.2.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.57.0"
@@ -28,6 +34,7 @@
   "private": true,
   "dependencies": {
     "better-sqlite3": "^12.8.0",
+    "express": "^5.2.1",
     "rss-parser": "^3.13.0"
   }
 }

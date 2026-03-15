@@ -24,8 +24,11 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
+EXPOSE 3000
+
 USER node
 
 VOLUME ["/app/data"]
 
-ENTRYPOINT ["npm", "run", "start", "--"]
+# Set default command (can be overridden)
+CMD ["npm", "run", "start:server"]
