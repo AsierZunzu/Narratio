@@ -1,5 +1,5 @@
-import { textToAudio } from '../src/tts'
-import { existsSync, unlinkSync } from 'fs'
+import { textToAudio, generateUnavailableAudio } from '../src/tts'
+import { existsSync, unlinkSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 describe('TTS Service', () => {
@@ -43,4 +43,54 @@ describe('TTS Service', () => {
 
     await expect(textToAudio(mockId, mockText)).rejects.toThrow('TTS request failed: Internal Server Error')
   })
-})
+
+  it('should generate unavailable audio with default message', async () => {
+    const mockAudioData = Buffer.from('mock-unavailable-audio')
+    const unavailablePath = join(process.cwd(), 'data', 'unavailable.wav')
+    
+    if (existsSync(unavailablePath)) {
+      unlinkSync(unavailablePath)
+    }
+
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(mockAudioData),
+    })
+
+    await generateUnavailableAudio()
+
+    expect(existsSync(unavailablePath)).toBe(true)
+    expect(readFileSync(unavailablePath).toString()).toBe('mock-unavailable-audio')
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent('This content is no longer available on the server.'))
+    )
+
+    unlinkSync(unavailablePath)
+  })
+
+  it('should generate unavailable audio with custom message from env', async () => {
+    process.env.UNAVAILABLE_MESSAGE = 'Custom unavailable message'
+    const mockAudioData = Buffer.from('custom-unavailable-audio')
+    const unavailablePath = join(process.cwd(), 'data', 'unavailable.wav')
+
+    if (existsSync(unavailablePath)) {
+      unlinkSync(unavailablePath)
+    }
+
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(mockAudioData),
+    })
+
+    await generateUnavailableAudio()
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent('Custom unavailable message'))
+    )
+
+    delete process.env.UNAVAILABLE_MESSAGE
+    if (existsSync(unavailablePath)) {
+      unlinkSync(unavailablePath)
+    }
+  })
+});

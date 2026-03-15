@@ -23,17 +23,21 @@ app.get('/rss', (req, res) => {
     siteUrl: siteUrl,
   });
 
-  const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL ORDER BY pub_date DESC').all() as any[];
+  const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC').all() as any[];
 
   articles.forEach(article => {
+    const audioUrl = article.is_purged 
+      ? `${siteUrl}/audio/unavailable.wav`
+      : `${siteUrl}/audio/${article.audio_path.split(/[/\\]/).pop()}`;
+
     podcast.addItem({
-      title: article.title,
+      title: article.is_purged ? `[PURGED] ${article.title}` : article.title,
       description: article.content,
       url: article.link,
       guid: article.id,
       date: article.pub_date,
       enclosure: {
-        url: `${siteUrl}/audio/${article.audio_path.split(/[/\\]/).pop()}`,
+        url: audioUrl,
         size: 0,
         type: 'audio/mpeg'
       }
@@ -47,6 +51,11 @@ app.get('/rss', (req, res) => {
 describe('Server/RSS Feed', () => {
   beforeAll(() => {
     // Clear and setup test database
+    try {
+      db.exec('ALTER TABLE articles ADD COLUMN is_purged INTEGER DEFAULT 0');
+    } catch (e) {
+      // Column might already exist
+    }
     db.prepare('DELETE FROM articles').run();
     db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?, ?, ?, ?, ?, ?)')
       .run('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1', 'data/audio/test1.mp3');
@@ -71,6 +80,17 @@ describe('Server/RSS Feed', () => {
     
     // For this test to be meaningful, we'd need to test the logic in src/server.ts
     // Let's assume the developer wants to see the logic tested.
+  });
+
+  test('should serve RSS feed including purged items', async () => {
+    // Add a purged item
+    db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path, is_purged) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('2', 'Article 2', 'http://example.com/2', '2023-01-02', 'Content 2', null, 1);
+
+    const response = await request(app).get('/rss');
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('[PURGED] Article 2');
+    expect(response.text).toContain('unavailable.wav');
   });
 
   test('should serve static audio files', async () => {
