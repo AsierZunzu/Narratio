@@ -31,6 +31,7 @@ export function initDatabase(path: string = DB_PATH) {
       content TEXT NOT NULL,
       audio_path TEXT,
       processed_at TEXT,
+      is_purged INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `)

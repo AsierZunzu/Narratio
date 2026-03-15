@@ -32,7 +32,7 @@ export function cleanupStorage(): void {
   let currentCount = files.length
   let currentSize = files.reduce((sum, f) => sum + f.size, 0)
 
-  const updateDb = db.prepare('UPDATE articles SET audio_path = NULL, processed_at = NULL WHERE audio_path LIKE ?')
+  const updateDb = db.prepare('UPDATE articles SET audio_path = NULL, processed_at = NULL, is_purged = 1 WHERE audio_path LIKE ?')
 
   for (const file of files) {
     const exceedsCount = currentCount > MAX_FILES

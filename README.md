@@ -47,6 +47,7 @@ The application can be configured using environment variables. Default values ar
 - `PODCAST_ITUNES_OWNER_NAME`: iTunes-specific owner name (defaults to `PODCAST_AUTHOR`).
 - `PODCAST_ITUNES_OWNER_EMAIL`: iTunes-specific owner email (default: `worker@example.com`).
 - `PODCAST_ITUNES_CATEGORY`: iTunes-specific category (default: `Technology`).
+- `UNAVAILABLE_MESSAGE`: Message to be used for purged articles (default: `This content is no longer available on the server.`).
 
 ## Usage
 

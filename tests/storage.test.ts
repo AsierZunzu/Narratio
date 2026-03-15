@@ -90,8 +90,9 @@ describe('Storage Cleanup', () => {
     expect(fs.existsSync(file3)).toBe(true)
     
     // Check database update
-    const art1 = db.prepare("SELECT audio_path FROM articles WHERE id = '1'").get() as { audio_path: string | null }
+    const art1 = db.prepare("SELECT audio_path, is_purged FROM articles WHERE id = '1'").get() as { audio_path: string | null, is_purged: number }
     expect(art1.audio_path).toBeNull()
+    expect(art1.is_purged).toBe(1)
   })
 
   test('should delete oldest files when MAX_AUDIO_SIZE_MB is exceeded', () => {

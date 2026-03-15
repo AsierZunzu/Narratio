@@ -14,6 +14,7 @@ services:
       - PODCAST_LANGUAGE=en
       - PODCAST_ITUNES_CATEGORY=Technology
       - PODCAST_ITUNES_OWNER_EMAIL=worker@example.com
+      - UNAVAILABLE_MESSAGE=This content is no longer available on the server.
     depends_on:
       - tts-engine
     command: ["npm", "run", "start:server"]
