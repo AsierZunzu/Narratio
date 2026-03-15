@@ -1,6 +1,19 @@
 services:
   app:
     build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PIPER_URL=http://tts-engine:5000
+    depends_on:
+      - tts-engine
+    command: ["npm", "run", "start:server"]
+
+  worker:
+    build: .
     volumes:
       - ./data:/app/data
     environment:
@@ -9,7 +22,7 @@ services:
     depends_on:
       - tts-engine
     # Example usage:
-    command: ["http://feeds.bbci.co.uk/news/rss.xml"]
+    command: ["npm", "run", "start:worker", "--", "http://feeds.bbci.co.uk/news/rss.xml"]
 
   tts-engine:
     image: rhasspy/piper:latest
