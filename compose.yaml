@@ -5,5 +5,17 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
+      - PIPER_URL=http://tts-engine:5000
+    depends_on:
+      - tts-engine
     # Example usage:
     command: ["http://feeds.bbci.co.uk/news/rss.xml"]
+
+  tts-engine:
+    image: rhasspy/piper:latest
+#    ports:
+#      - "5000:5000"
+    command: ["--model", "en_US-lessac-medium"]
+    # For natural Spanish voices, use:
+    # command: ["--model", "es_ES-sharvard-medium"]
+    # For a list of models: https://github.com/rhasspy/piper/releases/tag/v0.0.2
