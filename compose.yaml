@@ -8,6 +8,12 @@ services:
     environment:
       - NODE_ENV=production
       - PIPER_URL=http://tts-engine:5000
+      - PODCAST_TITLE=RSS to Podcast
+      - PODCAST_DESCRIPTION=Automatically generated podcast from RSS feeds
+      - PODCAST_AUTHOR=RSS to Podcast Worker
+      - PODCAST_LANGUAGE=en
+      - PODCAST_ITUNES_CATEGORY=Technology
+      - PODCAST_ITUNES_OWNER_EMAIL=worker@example.com
     depends_on:
       - tts-engine
     command: ["npm", "run", "start:server"]
@@ -19,10 +25,11 @@ services:
     environment:
       - NODE_ENV=production
       - PIPER_URL=http://tts-engine:5000
+      - RSS_URLS=http://feeds.bbci.co.uk/news/rss.xml
     depends_on:
       - tts-engine
-    # Example usage:
-    command: ["npm", "run", "start:worker", "--", "http://feeds.bbci.co.uk/news/rss.xml"]
+    # Example usage (can still override via CLI):
+    command: ["npm", "run", "start:worker"]
 
   tts-engine:
     image: rhasspy/piper:latest

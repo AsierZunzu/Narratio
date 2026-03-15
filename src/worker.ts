@@ -2,9 +2,16 @@ import { parseRSSFeeds } from './rss'
 import { isValidURL, checkReachability } from './utils/url'
 
 async function main() {
-  const args = process.argv.slice(2)
+  let args = process.argv.slice(2)
+  
+  // Also check for URLs in environment variable
+  if (process.env.RSS_URLS) {
+    const envUrls = process.env.RSS_URLS.split(',').map(u => u.trim()).filter(u => u.length > 0)
+    args = [...args, ...envUrls]
+  }
+
   if (args.length === 0) {
-    console.error('Error: No RSS URLs provided.')
+    console.error('Error: No RSS URLs provided. Use command line arguments or RSS_URLS environment variable.')
     process.exit(1)
   }
 
