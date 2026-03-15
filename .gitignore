@@ -7,3 +7,6 @@
 #App
 dist/
 data/
+
+# Docker
+/compose.override.yaml
