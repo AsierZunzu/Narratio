@@ -1,13 +1,15 @@
 import Parser from 'rss-parser'
-import { db } from './database/db'
+import { db as defaultDb } from './database/db'
+import { Database as BetterSqlite3Database } from 'better-sqlite3'
 
 const parser = new Parser()
 
-export async function parseRSSFeeds(urls: string[]) {
+export async function parseRSSFeeds(urls: string[], db: BetterSqlite3Database = defaultDb, customParser?: Parser) {
+  const p = customParser || parser
   for (const url of urls) {
     try {
       console.log(`Fetching feed from: ${url}`)
-      const feed = await parser.parseURL(url)
+      const feed = await p.parseURL(url)
       console.log(`Processing feed: ${feed.title}`)
 
       const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content) VALUES (?, ?, ?, ?, ?)')

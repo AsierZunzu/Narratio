@@ -1,16 +1,17 @@
 import Database from 'better-sqlite3'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 
 const DATA_DIR = join(process.cwd(), 'data')
 const DB_PATH = join(DATA_DIR, 'podcast.db')
 
-export function initDatabase() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true })
+export function initDatabase(path: string = DB_PATH) {
+  const dir = dirname(path)
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true })
   }
 
-  const db = new Database(DB_PATH)
+  const db = new Database(path)
 
   // Enable WAL mode for better performance
   db.pragma('journal_mode = WAL')
