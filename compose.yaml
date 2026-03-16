@@ -1,6 +1,7 @@
 services:
   server:
     build: .
+    container_name: server
     ports:
       - "3000:3000"
     volumes:
@@ -21,6 +22,7 @@ services:
 
   worker:
     build: .
+    container_name: worker
     volumes:
       - ./data:/app/data
     environment:
@@ -37,9 +39,9 @@ services:
 
   tts-engine:
     image: lscr.io/linuxserver/piper:latest
+    container_name: piper
 #    ports:
 #      - 10200:10200
-    container_name: piper
     environment:
       - PUID=1000
       - PGID=1000
