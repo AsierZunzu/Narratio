@@ -3,7 +3,7 @@ import { Podcast } from 'podcast'
 import { join } from 'path'
 import { db } from './database/db'
 import { statSync, existsSync } from 'fs'
-import { generateUnavailableAudio } from './tts'
+import { textToAudio } from './tts'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -93,7 +93,7 @@ app.get('/rss', (req, res) => {
 
 export async function startServer() {
   // Ensure unavailable audio exists on startup
-  const unavailablePath = join(DATA_DIR, 'unavailable.wav')
+  const unavailablePath = join(AUDIO_DIR, 'unavailable.wav')
   if (!existsSync(unavailablePath)) {
     await generateUnavailableAudio()
   }
@@ -106,4 +106,17 @@ export async function startServer() {
 
 if (require.main === module) {
   startServer()
+}
+
+async function generateUnavailableAudio(): Promise<void> {
+  const message = process.env.UNAVAILABLE_MESSAGE || 'This content is no longer available on the server.';
+  const filePath = join(AUDIO_DIR, 'unavailable.wav');
+
+  try {
+    console.log('Generating unavailable audio...');
+    await textToAudio('unavailable', message, filePath);
+    console.log(`Unavailable audio generated at: ${filePath}`);
+  } catch (err) {
+    console.error('Failed to generate unavailable audio:', err);
+  }
 }
