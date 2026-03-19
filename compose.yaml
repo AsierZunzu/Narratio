@@ -55,3 +55,11 @@ services:
       - PIPER_NOISEW=0.333 #optional
       - PIPER_SPEAKER=0 #optional
       - NO_STREAMING= #optional
+    healthcheck:
+      test: >
+        bash -c 'printf "{\"type\":\"describe\"}\n" | nc -q 1 localhost 10200 | grep -q "type.*info"'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+      start_interval: 5s
