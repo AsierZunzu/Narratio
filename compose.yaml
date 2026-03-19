@@ -42,6 +42,8 @@ services:
   piper:
     image: lscr.io/linuxserver/piper:latest
     container_name: piper
+    volumes:
+      - ./data/piper:/config
     environment:
       - PUID=1000
       - PGID=1000
