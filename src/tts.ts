@@ -51,6 +51,13 @@ export async function textToAudio(id: string, text: string, customPath?: string)
     const client = new Socket()
     let receivedData = false
     let audioData = Buffer.alloc(0)
+    let settled = false
+
+    function settle(fn: () => void) {
+      if (settled) return
+      settled = true
+      fn()
+    }
 
     // Wyoming protocol parsing state
     let buffer = Buffer.alloc(0)
@@ -67,7 +74,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
     // Set a timeout to avoid hanging
     const timeout = setTimeout(() => {
       client.destroy()
-      reject(new Error('TTS request timed out'))
+      settle(() => reject(new Error('TTS request timed out')))
     }, TIMEOUT_MS)
 
     client.connect(PIPER_PORT, PIPER_HOST, () => {
@@ -111,7 +118,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
             } else if (resolvedType === 'error') {
               clearTimeout(timeout)
               client.destroy()
-              reject(new Error(`Piper error: ${pendingBlock.toString()}`))
+              settle(() => reject(new Error(`Piper error: ${pendingBlock.toString()}`)))
               return
             }
 
@@ -171,14 +178,17 @@ export async function textToAudio(id: string, text: string, customPath?: string)
             inPayload = true
           } else if (header.type === 'audio-stop') {
             clearTimeout(timeout)
-            client.destroy()
+            // Graceful half-close — sends TCP FIN so Piper can finish its wav_writer
+            // cleanly before we're done. Hard destroy() here leaves Piper's asyncio
+            // coroutine in a broken state that corrupts subsequent connections.
+            client.end()
             if (audioData.length === 0) {
-              reject(new Error('Connected to Piper but received no audio payload'))
+              settle(() => reject(new Error('Connected to Piper but received no audio payload')))
               return
             }
             writeFileSync(audioPath, buildWav(audioData, sampleRate, sampleWidth, channels))
             console.log('Audio file stored at:', audioPath, `(${audioData.length} PCM bytes)`)
-            resolve(audioPath)
+            settle(() => resolve(audioPath))
             return
           } else if (header.type === 'error') {
             // Read the error data block before rejecting so we can report the actual message
@@ -193,12 +203,12 @@ export async function textToAudio(id: string, text: string, customPath?: string)
               buffer = buffer.subarray(header.data_length)
               clearTimeout(timeout)
               client.destroy()
-              reject(new Error(`Piper error: ${errorMsg}`))
+              settle(() => reject(new Error(`Piper error: ${errorMsg}`)))
               return
             }
             clearTimeout(timeout)
             client.destroy()
-            reject(new Error(`Piper error (no details): ${headerStr}`))
+            settle(() => reject(new Error(`Piper error (no details): ${headerStr}`)))
             return
           }
         } else {
@@ -218,27 +228,28 @@ export async function textToAudio(id: string, text: string, customPath?: string)
 
     client.on('end', () => {
       clearTimeout(timeout)
-
+      // audio-stop already resolved the promise in the happy path.
+      // Only handle unexpected server-side disconnects here.
       if (!receivedData) {
-        reject(new Error('No data received from Piper server'))
+        settle(() => reject(new Error('No data received from Piper server')))
         return
       }
-
       if (audioData.length === 0) {
-        reject(new Error('Connected to Piper but received no audio payload'))
+        settle(() => reject(new Error('Connected to Piper but received no audio payload')))
         return
       }
-
+      // Fallback: server closed without audio-stop (shouldn't happen with Piper,
+      // but write the file rather than silently losing the audio).
       writeFileSync(audioPath, buildWav(audioData, sampleRate, sampleWidth, channels))
       client.destroy()
       console.log('Audio file stored at:', audioPath, `(${audioData.length} PCM bytes)`)
-      resolve(audioPath)
+      settle(() => resolve(audioPath))
     })
 
     client.on('error', (err: Error) => {
       clearTimeout(timeout)
       client.destroy()
-      reject(new Error(`TTS request failed: ${err.message}`))
+      settle(() => reject(new Error(`TTS request failed: ${err.message}`)))
     })
   })
 }
