@@ -34,15 +34,15 @@ The application can be configured using environment variables. Default values ar
 Once the application is started with an `RSS_URL`, it stores this URL in its database to maintain consistency. If you need to change the RSS feed URL later, you must reinitialize the database, which will also delete all previously fetched articles and generated audio files.
 
 **Manual Reinitialization:**
-If you are running the worker manually, use the `--force` flag:
+If you are running the worker manually, use the `--force-reset` flag:
 ```bash
-npm run start:worker -- <NEW_RSS_URL> --force
+npm run start:worker -- <NEW_RSS_URL> --force-reset
 ```
 
 **Docker Reinitialization:**
 If you are using Docker Compose, you can update the `RSS_URL` in your `compose.yaml` (or environment) and then run the following command to reinitialize:
 ```bash
-docker compose run --rm worker npm run start:worker -- <NEW_RSS_URL> --force
+docker compose run --rm worker npm run start:worker -- <NEW_RSS_URL> --force-reset
 ```
 Alternatively, you can manually delete the contents of the `data/` directory and restart the stack.
 
