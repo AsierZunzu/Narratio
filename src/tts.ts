@@ -35,18 +35,3 @@ export async function textToAudio(id: string, text: string, customPath?: string)
 
   return audioPath
 }
-
-export async function generateUnavailableAudio(): Promise<void> {
-  const message = process.env.UNAVAILABLE_MESSAGE || 'This content is no longer available on the server.'
-  const filePath = join(DATA_DIR, 'unavailable.wav')
-
-  // Check if it already exists to avoid redundant generation
-  // We could also check metadata if the message has changed
-  try {
-    console.log('Generating unavailable audio...')
-    await textToAudio('unavailable', message, filePath)
-    console.log(`Unavailable audio generated at: ${filePath}`)
-  } catch (err) {
-    console.error('Failed to generate unavailable audio:', err)
-  }
-}
