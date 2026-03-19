@@ -8,7 +8,8 @@ services:
       - ./data/app:/app/data
     environment:
       - NODE_ENV=production
-      - PIPER_URL=http://piper:10200
+      - PIPER_HOST=piper
+      - PIPER_PORT=10200
       - PODCAST_TITLE=RSS to Podcast
       - PODCAST_DESCRIPTION=Automatically generated podcast from RSS feeds
       - PODCAST_AUTHOR=RSS to Podcast Worker
@@ -28,7 +29,8 @@ services:
       - ./data/app:/app/data
     environment:
       - NODE_ENV=production
-      - PIPER_URL=http://piper:10200
+      - PIPER_HOST=piper
+      - PIPER_PORT=10200
       - RSS_URL=http://feeds.bbci.co.uk/news/rss.xml
       - POLL_INTERVAL=0 * * * *
       - MAX_AUDIO_FILES=50

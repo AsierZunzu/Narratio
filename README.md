@@ -49,7 +49,8 @@ Alternatively, you can manually delete the contents of the `data/` directory and
 ### Worker Configuration
 - `RSS_URL`: The RSS feed URL to parse (required).
 - `POLL_INTERVAL`: Cron expression for periodic polling (e.g., `0 * * * *` for hourly). If not set, the worker runs once and exits.
-- `PIPER_URL`: Host and port of the Piper TTS engine Wyoming API (default: `localhost:10200`).
+- `PIPER_HOST`: Host of the Piper TTS engine Wyoming API (default: `localhost`).
+- `PIPER_PORT`: Port of the Piper TTS engine Wyoming API (default: `10200`).
 - `MAX_AUDIO_FILES`: Maximum number of audio files to keep (default: `Infinity`).
 - `MAX_AUDIO_SIZE_MB`: Maximum total size of audio files in MB (default: `Infinity`).
 - `NODE_ENV`: Set to `production` for optimized execution.
