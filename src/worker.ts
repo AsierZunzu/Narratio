@@ -15,8 +15,8 @@ async function runWorkerTask(feedUrl: string) {
 
 export async function main() {
   const args = process.argv.slice(2)
-  const forceReset = args.includes('--force')
-  const urls = args.filter(arg => arg !== '--force')
+  const forceReset = args.includes('--force-reset')
+  const urls = args.filter(arg => arg !== '--force-reset')
   
   let feedUrl = urls[0]
 
@@ -47,22 +47,21 @@ export async function main() {
   // Check against stored feed URL
   const storedUrlRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_url\'').get() as { value: string } | undefined
   const storedUrl = storedUrlRow?.value
-
+  if (forceReset) {
+    console.log('Force reset requested. Reinitializing database for new feed...')
+    resetDatabase(db)
+    db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
+  }
   if (storedUrl && storedUrl !== feedUrl) {
-    if (forceReset) {
-      console.log('Force reset requested. Reinitializing database for new feed...')
-      resetDatabase()
-      db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
-    } else {
-      console.error('Error: The provided feed URL does not match the one stored in the database.')
-      console.error(`Stored: ${storedUrl}`)
-      console.error(`Provided: ${feedUrl}`)
-      console.error('If you want to change the feed, the database must be reinitialized.')
-      console.error('Use the --force flag to reinitialize the database and articles.')
-      process.exit(1)
-      return // for TS
-    }
-  } else if (!storedUrl) {
+    console.error('Error: The provided feed URL does not match the one stored in the database.')
+    console.error(`Stored: ${storedUrl}`)
+    console.error(`Provided: ${feedUrl}`)
+    console.error('If you want to change the feed, the database must be reinitialized.')
+    console.error('Use the --force-reset flag to reinitialize the database and articles.')
+    process.exit(1)
+    return // for TS
+  }
+  if (!storedUrl) {
     db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
   }
 
