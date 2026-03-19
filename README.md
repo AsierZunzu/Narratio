@@ -54,6 +54,7 @@ Alternatively, you can manually delete the contents of the `data/` directory and
 - `MAX_AUDIO_FILES`: Maximum number of audio files to keep (default: `Infinity`).
 - `MAX_AUDIO_SIZE_MB`: Maximum total size of audio files in MB (default: `Infinity`).
 - `NODE_ENV`: Set to `production` for optimized execution.
+- `TTS_TIMEOUT`: Timeout for the TTS engine in seconds (default: `300`).
 
 ### Server Configuration
 - `PORT`: The port the web server will listen on (default: `3000`).

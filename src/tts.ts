@@ -6,6 +6,7 @@ const DATA_DIR = join(process.cwd(), 'data');
 const AUDIO_DIR = join(DATA_DIR, 'audio');
 const PIPER_HOST = process.env.PIPER_HOST || 'localhost';
 const PIPER_PORT = parseInt(process.env.PIPER_PORT || '10200');
+const TIMEOUT_MS = parseInt(process.env.TTS_TIMEOUT || '300') * 1000;
 
 function buildWav(pcmData: Buffer, sampleRate: number, sampleWidth: number, channels: number): Buffer {
   const byteRate = sampleRate * channels * sampleWidth;
@@ -29,9 +30,6 @@ function buildWav(pcmData: Buffer, sampleRate: number, sampleWidth: number, chan
 
   return Buffer.concat([header, pcmData]);
 }
-
-const timeout_s = 300; //TODO extract to ENV
-const timeout_ms = timeout_s * 1000;
 
 export async function textToAudio(id: string, text: string, customPath?: string): Promise<string> {
   if (!existsSync(DATA_DIR)) {
@@ -64,7 +62,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
     const timeout = setTimeout(() => {
       client.destroy();
       reject(new Error('TTS request timed out'));
-    }, timeout_ms);
+    }, TIMEOUT_MS);
 
     client.connect(PIPER_PORT, PIPER_HOST, () => {
       console.log('Connected to Piper server');
