@@ -2,8 +2,14 @@ import Parser from 'rss-parser'
 import { db as defaultDb } from './database/db'
 import { Database as BetterSqlite3Database } from 'better-sqlite3'
 import { textToAudio } from './tts'
+import { convert } from 'html-to-text';
 
-const parser = new Parser()
+
+const parser = new Parser({
+  customFields: {
+    item: [['content:encoded', 'contentEncoded']],
+  }
+})
 
 export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser) {
   const p = customParser || parser
@@ -20,16 +26,24 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
       const title = item.title || 'No Title'
       const link = item.link || ''
       const pubDate = item.pubDate || new Date().toISOString()
-      const content = item.contentSnippet || item.content || ''
+      const content = item.contentEncoded || item.contentSnippet || item.content || ''
+      const humanContent = convert(content, {
+        selectors: [
+          { selector: 'img', format: 'skip' },
+          { selector: 'figure', format: 'skip' },  // skips the whole figure/image block
+          { selector: 'a', options: { ignoreHref: true } },
+        ]
+      })
+      const text = `${title} \n\n\n ${humanContent}`
 
       try {
-        insert.run(id, title, link, pubDate, content)
+        insert.run(id, title, link, pubDate, humanContent)
         console.log(`- New article: ${title}`)
 
         // Trigger TTS for the new article
         try {
           console.log('  - Generating audio...')
-          const audioPath = await textToAudio(id.replace(/[^a-z0-9]/gi, '_'), content)
+          const audioPath = await textToAudio(id.replace(/[^a-z0-9]/gi, '_'), text)
           update.run(audioPath, new Date().toISOString(), id)
           console.log(`  - Audio saved: ${audioPath}`)
         } catch (ttsErr) {
