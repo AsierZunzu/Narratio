@@ -2,16 +2,19 @@ import Parser from 'rss-parser'
 import { db as defaultDb } from './database/db'
 import { Database as BetterSqlite3Database } from 'better-sqlite3'
 import { textToAudio } from './tts'
-import { convert } from 'html-to-text';
+import { convert } from 'html-to-text'
 
+type CustomItem = {
+  contentEncoded?: string
+}
 
-const parser = new Parser({
+const parser = new Parser<Record<string, never>, CustomItem>({
   customFields: {
     item: [['content:encoded', 'contentEncoded']],
   }
 })
 
-export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser) {
+export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser<Record<string, never>, CustomItem>) {
   const p = customParser || parser
   try {
     console.log(`Fetching feed from: ${url}`)

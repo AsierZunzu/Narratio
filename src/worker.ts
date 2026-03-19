@@ -1,4 +1,4 @@
-import cron from 'node-cron'
+import * as cron from 'node-cron'
 import { parseRSSFeed } from './rss'
 import { isValidURL, checkReachability } from './utils/url'
 import { db, resetDatabase } from './database/db'
@@ -17,12 +17,12 @@ export async function main() {
   const args = process.argv.slice(2)
   const forceReset = args.includes('--force-reset')
   const urls = args.filter(arg => arg !== '--force-reset')
-  
+
   let feedUrl = urls[0]
 
   // Also check for URL in environment variable if not provided via CLI
-  if (!feedUrl && process.env.RSS_URL) {
-    feedUrl = process.env.RSS_URL.trim()
+  if (!feedUrl && process.env['RSS_URL']) {
+    feedUrl = process.env['RSS_URL'].trim()
   }
 
   if (!feedUrl) {
@@ -65,7 +65,7 @@ export async function main() {
     db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
   }
 
-  const pollInterval = process.env.POLL_INTERVAL
+  const pollInterval = process.env['POLL_INTERVAL']
 
   if (pollInterval) {
     if (!cron.validate(pollInterval)) {
@@ -75,12 +75,12 @@ export async function main() {
     }
 
     console.log(`Starting worker in cron mode: "${pollInterval}"`)
-    
+
     // Run immediately on start
     await runWorkerTask(feedUrl)
 
     cron.schedule(pollInterval, () => runWorkerTask(feedUrl))
-    
+
     console.log('Worker is active and waiting for next scheduled run.')
   } else {
     // Single run mode

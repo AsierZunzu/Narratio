@@ -6,7 +6,7 @@ import { statSync, existsSync } from 'fs'
 import { textToAudio } from './tts'
 
 const app = express()
-const port = process.env.PORT || 3000
+const port = process.env['PORT'] || 3000
 const DATA_DIR = join(process.cwd(), 'data')
 const AUDIO_DIR = join(DATA_DIR, 'audio')
 
@@ -28,26 +28,26 @@ app.get('/rss', (req, res) => {
   const feedUrl = `${req.protocol}://${req.get('host')}/rss`
   const siteUrl = `${req.protocol}://${req.get('host')}`
 
-  const storedUrlRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_url\'').get() as { value: string } | undefined
+  const storedUrlRow = db.prepare(`SELECT value FROM metadata WHERE key = 'feed_url'`).get() as { value: string } | undefined
   const defaultDescription = storedUrlRow ? `Automatically generated podcast from ${storedUrlRow.value}` : 'Automatically generated podcast from RSS feeds'
 
   const podcast = new Podcast({
-    title: process.env.PODCAST_TITLE || 'RSS to Podcast',
-    description: process.env.PODCAST_DESCRIPTION || defaultDescription,
+    title: process.env['PODCAST_TITLE'] || 'RSS to Podcast',
+    description: process.env['PODCAST_DESCRIPTION'] || defaultDescription,
     feedUrl: feedUrl,
     siteUrl: siteUrl,
-    author: process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker',
-    language: process.env.PODCAST_LANGUAGE || 'en',
-    itunesAuthor: process.env.PODCAST_ITUNES_AUTHOR || process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker',
-    itunesSummary: process.env.PODCAST_ITUNES_SUMMARY || process.env.PODCAST_DESCRIPTION || defaultDescription,
-    itunesOwner: { 
-      name: process.env.PODCAST_ITUNES_OWNER_NAME || process.env.PODCAST_AUTHOR || 'RSS to Podcast Worker', 
-      email: process.env.PODCAST_ITUNES_OWNER_EMAIL || 'worker@example.com' 
+    author: process.env['PODCAST_AUTHOR'] || 'RSS to Podcast Worker',
+    language: process.env['PODCAST_LANGUAGE'] || 'en',
+    itunesAuthor: process.env['PODCAST_ITUNES_AUTHOR'] || process.env['PODCAST_AUTHOR'] || 'RSS to Podcast Worker',
+    itunesSummary: process.env['PODCAST_ITUNES_SUMMARY'] || process.env['PODCAST_DESCRIPTION'] || defaultDescription,
+    itunesOwner: {
+      name: process.env['PODCAST_ITUNES_OWNER_NAME'] || process.env['PODCAST_AUTHOR'] || 'RSS to Podcast Worker',
+      email: process.env['PODCAST_ITUNES_OWNER_EMAIL'] || 'worker@example.com'
     },
-    itunesCategory: [{ text: process.env.PODCAST_ITUNES_CATEGORY || 'Technology' }],
+    itunesCategory: [{ text: process.env['PODCAST_ITUNES_CATEGORY'] || 'Technology' }],
   })
 
-  const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC').all() as Article[]
+  const articles = db.prepare(`SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC`).all() as Article[]
 
   articles.forEach(article => {
     let audioUrl: string
@@ -64,7 +64,7 @@ app.get('/rss', (req, res) => {
     } else {
       const audioFileName = article.audio_path!.split(/[/\\]/).pop()
       audioUrl = `${siteUrl}/audio/${audioFileName}`
-      
+
       try {
         const stats = statSync(article.audio_path!)
         fileSize = stats.size
@@ -105,18 +105,21 @@ export async function startServer() {
 }
 
 if (require.main === module) {
-  startServer()
+  startServer().catch(err => {
+    console.error('Fatal error starting server:', err)
+    process.exit(1)
+  })
 }
 
 async function generateUnavailableAudio(): Promise<void> {
-  const message = process.env.UNAVAILABLE_MESSAGE || 'This content is no longer available on the server.';
-  const filePath = join(AUDIO_DIR, 'unavailable.wav');
+  const message = process.env['UNAVAILABLE_MESSAGE'] || 'This content is no longer available on the server.'
+  const filePath = join(AUDIO_DIR, 'unavailable.wav')
 
   try {
-    console.log('Generating unavailable audio...');
-    await textToAudio('unavailable', message, filePath);
-    console.log(`Unavailable audio generated at: ${filePath}`);
+    console.log('Generating unavailable audio...')
+    await textToAudio('unavailable', message, filePath)
+    console.log(`Unavailable audio generated at: ${filePath}`)
   } catch (err) {
-    console.error('Failed to generate unavailable audio:', err);
+    console.error('Failed to generate unavailable audio:', err)
   }
 }
