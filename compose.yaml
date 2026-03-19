@@ -1,5 +1,5 @@
 services:
-  server:
+  podcastyfy-server:
     build: .
     container_name: server
     ports:
@@ -21,7 +21,7 @@ services:
         condition: service_healthy
     command: ["npm", "run", "start:server"]
 
-  worker:
+  podcastyfy-worker:
     build: .
     container_name: worker
     volumes:
