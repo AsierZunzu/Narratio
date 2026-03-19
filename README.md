@@ -117,7 +117,7 @@ npm run lint:fix
 
 ## Architecture
 
-- **Worker**: Periodically polls RSS feeds, extracts content, and calls the TTS engine.
-- **TTS Engine**: Converts text to MP3 using [Piper](https://github.com/rhasspy/piper).
+- **Worker**: Periodically polls RSS feeds, extracts content, and calls the TTS engine via Wyoming protocol (TCP).
+- **TTS Engine**: Converts text to WAV using [Piper](https://github.com/rhasspy/piper).
 - **SQLite**: Stores article metadata and processing status.
 - **Server**: Express-based web server that serves the generated MP3 files and the Podcast XML.
