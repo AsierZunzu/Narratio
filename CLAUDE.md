@@ -42,6 +42,7 @@ The whole operation is wrapped in a `TTS_TIMEOUT` (env var, default 30s) promise
 | `POLL_INTERVAL` | worker | Cron expression (e.g. `0 * * * *`) |
 | `PIPER_HOST` / `PIPER_PORT` | worker | Wyoming TCP endpoint |
 | `TTS_TIMEOUT` | worker | TTS timeout in ms (default 30000) |
+| `RSS_FETCH_TIMEOUT` | worker | RSS feed fetch timeout in ms (default 30000) |
 | `MAX_AUDIO_FILES` | worker | Max WAV files to retain |
 | `MAX_AUDIO_SIZE_MB` | worker | Max total audio storage in MB |
 | `PORT` | server | HTTP port (default 3000) |
@@ -59,3 +60,4 @@ The whole operation is wrapped in a `TTS_TIMEOUT` (env var, default 30s) promise
 - All new code should be created with tests
 - Check if the README requires updates after each change
 - Commands should be run in Powershell
+- Use relative paths on commands
