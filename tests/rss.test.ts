@@ -8,6 +8,11 @@ jest.mock('../src/tts', () => ({
   textToAudio: (...args: unknown[]) => textToAudioMock(...args)
 }))
 
+const cleanupStorageMock = jest.fn()
+jest.mock('../src/utils/storage', () => ({
+  cleanupStorage: (...args: unknown[]) => cleanupStorageMock(...args)
+}))
+
 describe('RSS Parsing', () => {
   let mockDb: any
   let mockParser: any
@@ -172,5 +177,22 @@ describe('RSS Parsing', () => {
     )
     // updateSuccess sets tts_retry_count=0, tts_failed_at=NULL, tts_error=NULL via the SQL
     expect(updateFailureMock.run).not.toHaveBeenCalled()
+  })
+
+  test('should timeout if RSS feed fetch exceeds RSS_FETCH_TIMEOUT', async () => {
+    jest.useFakeTimers()
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+    mockParser.parseURL.mockReturnValue(new Promise(() => {})) // never resolves
+
+    const parsePromise = parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+    jest.runAllTimers()
+    await parsePromise
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Error parsing feed from http://test-feed.com:'),
+      expect.objectContaining({ message: expect.stringContaining('timed out') })
+    )
+    consoleSpy.mockRestore()
+    jest.useRealTimers()
   })
 })

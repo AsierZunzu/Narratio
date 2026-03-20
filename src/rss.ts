@@ -18,6 +18,7 @@ const parser = new Parser<Record<string, never>, CustomItem>({
 })
 
 const TTS_MAX_RETRIES = parseInt(process.env.TTS_MAX_RETRIES ?? '3', 10)
+const RSS_FETCH_TIMEOUT = parseInt(process.env['RSS_FETCH_TIMEOUT'] ?? '30000', 10)
 
 async function retryFailedArticles(db: BetterSqlite3Database): Promise<void> {
   const eligible = db.prepare(`
@@ -64,9 +65,19 @@ async function retryFailedArticles(db: BetterSqlite3Database): Promise<void> {
 
 export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser<Record<string, never>, CustomItem>) {
   const p = customParser || parser
+  let fetchTimeoutId: ReturnType<typeof setTimeout> | undefined
   try {
     logger.log(`Fetching feed: ${url}`)
-    const feed = await p.parseURL(url)
+    const feed = await Promise.race([
+      p.parseURL(url),
+      new Promise<never>((_, reject) => {
+        fetchTimeoutId = setTimeout(
+          () => reject(new Error(`RSS fetch timed out after ${RSS_FETCH_TIMEOUT}ms`)),
+          RSS_FETCH_TIMEOUT
+        )
+      })
+    ])
+    clearTimeout(fetchTimeoutId)
     logger.log(`Processing feed: ${feed.title}`)
 
     const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content) VALUES (?, ?, ?, ?, ?)')
@@ -127,6 +138,7 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
 
     await retryFailedArticles(db)
   } catch (err) {
+    clearTimeout(fetchTimeoutId)
     logger.error(`Error parsing feed from ${url}:`, err)
   }
 }
