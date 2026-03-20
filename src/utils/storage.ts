@@ -5,6 +5,22 @@ import { db } from '../database/db'
 const DATA_DIR = join(process.cwd(), 'data')
 const AUDIO_DIR = join(DATA_DIR, 'audio')
 
+export function deleteAllAudioFiles(): void {
+  if (!existsSync(AUDIO_DIR)) return
+
+  const files = readdirSync(AUDIO_DIR).filter(file => file.endsWith('.wav'))
+
+  for (const file of files) {
+    const filePath = join(AUDIO_DIR, file)
+    try {
+      unlinkSync(filePath)
+      console.log(`- Force reset: Removed audio file ${file}`)
+    } catch (err) {
+      console.error(`- Force reset: Failed to remove ${file}:`, err)
+    }
+  }
+}
+
 export function cleanupStorage(): void {
   const MAX_FILES = process.env.MAX_AUDIO_FILES ? parseInt(process.env.MAX_AUDIO_FILES, 10) : Infinity
   const MAX_SIZE_MB = process.env.MAX_AUDIO_SIZE_MB ? parseFloat(process.env.MAX_AUDIO_SIZE_MB) : Infinity

@@ -2,6 +2,7 @@ import * as cron from 'node-cron'
 import { parseRSSFeed } from './rss'
 import { isValidURL, checkReachability } from './utils/url'
 import { db, resetDatabase } from './database/db'
+import { deleteAllAudioFiles } from './utils/storage'
 
 async function runWorkerTask(feedUrl: string) {
   try {
@@ -49,6 +50,7 @@ export async function main() {
   const storedUrl = storedUrlRow?.value
   if (forceReset) {
     console.log('Force reset requested. Reinitializing database for new feed...')
+    deleteAllAudioFiles()
     resetDatabase(db)
     db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
   }

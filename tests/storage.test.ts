@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { cleanupStorage } from '../src/utils/storage'
+import { cleanupStorage, deleteAllAudioFiles } from '../src/utils/storage'
 import { db } from '../src/database/db'
 
 jest.mock('../src/database/db', () => {
@@ -12,6 +12,40 @@ jest.mock('../src/database/db', () => {
 })
 
 const AUDIO_DIR = path.join(process.cwd(), 'data', 'audio')
+
+describe('deleteAllAudioFiles', () => {
+  beforeAll(() => {
+    if (!fs.existsSync(AUDIO_DIR)) {
+      fs.mkdirSync(AUDIO_DIR, { recursive: true })
+    }
+  })
+
+  afterEach(() => {
+    const files = fs.readdirSync(AUDIO_DIR)
+    for (const file of files) {
+      if (file.startsWith('test-')) {
+        fs.unlinkSync(path.join(AUDIO_DIR, file))
+      }
+    }
+  })
+
+  test('should delete all wav files in the audio directory', () => {
+    const file1 = path.join(AUDIO_DIR, 'test-a.wav')
+    const file2 = path.join(AUDIO_DIR, 'test-b.wav')
+    fs.writeFileSync(file1, 'data')
+    fs.writeFileSync(file2, 'data')
+
+    deleteAllAudioFiles()
+
+    expect(fs.existsSync(file1)).toBe(false)
+    expect(fs.existsSync(file2)).toBe(false)
+  })
+
+  test('should do nothing if audio directory does not exist', () => {
+    // Should not throw
+    expect(() => deleteAllAudioFiles()).not.toThrow()
+  })
+})
 
 describe('Storage Cleanup', () => {
   beforeAll(() => {
