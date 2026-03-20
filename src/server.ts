@@ -28,7 +28,7 @@ app.get('/rss', (req, res) => {
   const feedUrl = `${req.protocol}://${req.get('host')}/rss`
   const siteUrl = `${req.protocol}://${req.get('host')}`
 
-  const storedUrlRow = db.prepare(`SELECT value FROM metadata WHERE key = 'feed_url'`).get() as { value: string } | undefined
+  const storedUrlRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_url\'').get() as { value: string } | undefined
   const defaultDescription = storedUrlRow ? `Automatically generated podcast from ${storedUrlRow.value}` : 'Automatically generated podcast from RSS feeds'
 
   const podcast = new Podcast({
@@ -47,7 +47,7 @@ app.get('/rss', (req, res) => {
     itunesCategory: [{ text: process.env['PODCAST_ITUNES_CATEGORY'] || 'Technology' }],
   })
 
-  const articles = db.prepare(`SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC`).all() as Article[]
+  const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC').all() as Article[]
 
   articles.forEach(article => {
     let audioUrl: string
@@ -90,6 +90,8 @@ app.get('/rss', (req, res) => {
   res.set('Content-Type', 'application/rss+xml')
   res.send(podcast.buildXml())
 })
+
+export { app }
 
 export async function startServer() {
   // Ensure unavailable audio exists on startup
