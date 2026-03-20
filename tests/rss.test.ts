@@ -195,4 +195,13 @@ describe('RSS Parsing', () => {
     consoleSpy.mockRestore()
     jest.useRealTimers()
   })
+
+  test('should call cleanupStorage after processing feed', async () => {
+    const mockFeed = { title: 'Test Feed', items: [] }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(cleanupStorageMock).toHaveBeenCalledTimes(1)
+  })
 })
