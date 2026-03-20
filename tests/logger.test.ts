@@ -1,4 +1,4 @@
-import { createLogger } from '../src/logger'
+import { createLogger } from '../src/utils/logger'
 
 describe('createLogger', () => {
   it('returns an object with log, warn, and error methods', () => {

@@ -1,10 +1,10 @@
-import { parseRSSFeed } from '../src/rss'
+import { parseRSSFeed } from '../src/services/rss'
 import Parser from 'rss-parser'
 
 jest.mock('rss-parser')
 
 const textToAudioMock = jest.fn().mockResolvedValue('/app/data/audio/test.wav')
-jest.mock('../src/tts', () => ({
+jest.mock('../src/services/tts', () => ({
   textToAudio: (...args: unknown[]) => textToAudioMock(...args)
 }))
 

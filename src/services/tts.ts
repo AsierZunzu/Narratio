@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { writeFileSync, existsSync, mkdirSync } from 'fs'
 import { Socket } from 'net'
-import { createLogger } from './logger'
+import { createLogger } from '../utils/logger'
 
 const logger = createLogger('TTS')
 

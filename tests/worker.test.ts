@@ -1,5 +1,5 @@
 import cron from 'node-cron'
-import { parseRSSFeed } from '../src/rss'
+import { parseRSSFeed } from '../src/services/rss'
 import { main } from '../src/worker'
 import { db } from '../src/database/db'
 
@@ -8,7 +8,7 @@ jest.mock('node-cron', () => ({
   validate: jest.fn().mockReturnValue(true),
   schedule: jest.fn().mockReturnValue({ stop: jest.fn() }),
 }))
-jest.mock('../src/rss', () => ({
+jest.mock('../src/services/rss', () => ({
   parseRSSFeed: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock('../src/utils/url', () => ({

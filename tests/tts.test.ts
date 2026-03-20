@@ -1,4 +1,4 @@
-import { textToAudio } from '../src/tts'
+import { textToAudio } from '../src/services/tts'
 import { join } from 'path'
 import { Socket } from 'net'
 

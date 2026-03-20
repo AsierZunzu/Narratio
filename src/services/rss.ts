@@ -1,10 +1,10 @@
 import Parser from 'rss-parser'
-import { db as defaultDb } from './database/db'
+import { db as defaultDb } from '../database/db'
 import { Database as BetterSqlite3Database } from 'better-sqlite3'
 import { textToAudio } from './tts'
 import { convert } from 'html-to-text'
-import { createLogger } from './logger'
-import { cleanupStorage } from './utils/storage'
+import { createLogger } from '../utils/logger'
+import { cleanupStorage } from '../utils/storage'
 
 const logger = createLogger('RSS')
 
