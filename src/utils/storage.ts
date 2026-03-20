@@ -1,5 +1,5 @@
 import { readdirSync, statSync, unlinkSync, existsSync } from 'fs'
-import { join } from 'path'
+import { join, basename } from 'path'
 import { db } from '../database/db'
 
 const DATA_DIR = join(process.cwd(), 'data')
@@ -52,15 +52,16 @@ export function cleanupStorage(): void {
     if (!exceedsCount && !exceedsSize) break
 
     try {
-      if (existsSync(article.path)) {
-        unlinkSync(article.path)
-      }
-      updateDb.run(article.id)
-      currentCount--
-      currentSize -= article.size
-      console.log(`- Storage cleanup: Removed oldest file ${article.path}`)
+      unlinkSync(article.path)
     } catch (err) {
-      console.error(`- Storage cleanup: Failed to remove ${article.path}:`, err)
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`- Storage cleanup: Failed to remove ${basename(article.path)}:`, err)
+        continue
+      }
     }
+    updateDb.run(article.id)
+    currentCount--
+    currentSize -= article.size
+    console.log(`- Storage cleanup: Removed oldest file ${basename(article.path)}`)
   }
 }
