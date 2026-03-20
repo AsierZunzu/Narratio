@@ -14,6 +14,51 @@ const parser = new Parser<Record<string, never>, CustomItem>({
   }
 })
 
+const TTS_MAX_RETRIES = parseInt(process.env.TTS_MAX_RETRIES ?? '3', 10)
+
+async function retryFailedArticles(db: BetterSqlite3Database): Promise<void> {
+  const eligible = db.prepare(`
+    SELECT id, title, content
+    FROM   articles
+    WHERE  audio_path IS NULL
+      AND  is_purged  = 0
+      AND  tts_retry_count > 0
+      AND  tts_retry_count < ?
+  `).all(TTS_MAX_RETRIES) as { id: string; title: string; content: string }[]
+
+  if (eligible.length === 0) return
+
+  const updateSuccess = db.prepare(`
+    UPDATE articles
+    SET audio_path      = ?,
+        processed_at    = ?,
+        tts_retry_count = 0,
+        tts_failed_at   = NULL,
+        tts_error       = NULL
+    WHERE id = ?
+  `)
+  const updateFailure = db.prepare(`
+    UPDATE articles
+    SET tts_retry_count = tts_retry_count + 1,
+        tts_failed_at   = ?,
+        tts_error       = ?
+    WHERE id = ?
+  `)
+
+  for (const article of eligible) {
+    const retryNum = (db.prepare('SELECT tts_retry_count FROM articles WHERE id = ?').get(article.id) as { tts_retry_count: number }).tts_retry_count
+    console.log(`  - Retrying TTS (attempt ${retryNum + 1}/${TTS_MAX_RETRIES}): ${article.title}`)
+    try {
+      const audioPath = await textToAudio(article.id.replace(/[^a-z0-9]/gi, '_'), article.content)
+      updateSuccess.run(audioPath, new Date().toISOString(), article.id)
+      console.log(`  - Audio saved: ${audioPath}`)
+    } catch (ttsErr) {
+      console.error(`  - TTS retry failed for ${article.title}:`, ttsErr)
+      updateFailure.run(new Date().toISOString(), ttsErr instanceof Error ? ttsErr.message : String(ttsErr), article.id)
+    }
+  }
+}
+
 export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser<Record<string, never>, CustomItem>) {
   const p = customParser || parser
   try {
@@ -22,7 +67,22 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
     console.log(`Processing feed: ${feed.title}`)
 
     const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content) VALUES (?, ?, ?, ?, ?)')
-    const update = db.prepare('UPDATE articles SET audio_path = ?, processed_at = ? WHERE id = ?')
+    const updateSuccess = db.prepare(`
+      UPDATE articles
+      SET audio_path      = ?,
+          processed_at    = ?,
+          tts_retry_count = 0,
+          tts_failed_at   = NULL,
+          tts_error       = NULL
+      WHERE id = ?
+    `)
+    const updateFailure = db.prepare(`
+      UPDATE articles
+      SET tts_retry_count = tts_retry_count + 1,
+          tts_failed_at   = ?,
+          tts_error       = ?
+      WHERE id = ?
+    `)
 
     for (const item of feed.items) {
       const id = item.guid || item.link || item.title || ''
@@ -47,10 +107,11 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
         try {
           console.log('  - Generating audio...')
           const audioPath = await textToAudio(id.replace(/[^a-z0-9]/gi, '_'), text)
-          update.run(audioPath, new Date().toISOString(), id)
+          updateSuccess.run(audioPath, new Date().toISOString(), id)
           console.log(`  - Audio saved: ${audioPath}`)
         } catch (ttsErr) {
           console.error(`  - TTS failed for ${title}:`, ttsErr)
+          updateFailure.run(new Date().toISOString(), ttsErr instanceof Error ? ttsErr.message : String(ttsErr), id)
         }
       } catch (err) {
         if (err instanceof Error && (err as { code?: string }).code === 'SQLITE_CONSTRAINT_PRIMARYKEY') {
@@ -60,6 +121,8 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
         }
       }
     }
+
+    await retryFailedArticles(db)
   } catch (err) {
     console.error(`Error parsing feed from ${url}:`, err)
   }
