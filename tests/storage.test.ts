@@ -84,72 +84,62 @@ describe('Storage Cleanup', () => {
   test('should not delete files if no limits are set', () => {
     const file1 = path.join(AUDIO_DIR, 'test-1.wav')
     fs.writeFileSync(file1, 'content')
-    
+    db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?,?,?,?,?,?)')
+      .run('1', 'T1', 'L1', 'Mon, 01 Jan 2024 00:00:00 GMT', 'C1', file1)
+
     cleanupStorage()
-    
+
     expect(fs.existsSync(file1)).toBe(true)
   })
 
-  test('should delete oldest files when MAX_AUDIO_FILES is exceeded', () => {
+  test('should delete oldest files by pub_date when MAX_AUDIO_FILES is exceeded', () => {
     process.env.MAX_AUDIO_FILES = '2'
-    
+
     const file1 = path.join(AUDIO_DIR, 'test-1.wav')
     const file2 = path.join(AUDIO_DIR, 'test-2.wav')
     const file3 = path.join(AUDIO_DIR, 'test-3.wav')
-    
-    // Create files with different mtimes
+
     fs.writeFileSync(file1, 'content1')
     db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?,?,?,?,?,?)')
-      .run('1', 'T1', 'L1', 'D1', 'C1', file1)
-    
-    // Wait a bit to ensure different mtime
-    // Or manually change mtime if filesystem supports it well in tests
-    const now = Date.now()
-    fs.utimesSync(file1, new Date(now - 3000), new Date(now - 3000))
+      .run('1', 'T1', 'L1', 'Mon, 01 Jan 2024 00:00:00 GMT', 'C1', file1)
 
     fs.writeFileSync(file2, 'content2')
     db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?,?,?,?,?,?)')
-      .run('2', 'T2', 'L2', 'D2', 'C2', file2)
-    fs.utimesSync(file2, new Date(now - 2000), new Date(now - 2000))
+      .run('2', 'T2', 'L2', 'Wed, 01 Jan 2025 00:00:00 GMT', 'C2', file2)
 
     fs.writeFileSync(file3, 'content3')
     db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?,?,?,?,?,?)')
-      .run('3', 'T3', 'L3', 'D3', 'C3', file3)
-    fs.utimesSync(file3, new Date(now - 1000), new Date(now - 1000))
+      .run('3', 'T3', 'L3', 'Thu, 01 Jan 2026 00:00:00 GMT', 'C3', file3)
 
     cleanupStorage()
-    
+
+    // file1 is oldest by pub_date and should be deleted
     expect(fs.existsSync(file1)).toBe(false)
     expect(fs.existsSync(file2)).toBe(true)
     expect(fs.existsSync(file3)).toBe(true)
-    
-    // Check database update
+
     const art1 = db.prepare("SELECT audio_path, is_purged FROM articles WHERE id = '1'").get() as { audio_path: string | null, is_purged: number }
     expect(art1.audio_path).toBeNull()
     expect(art1.is_purged).toBe(1)
   })
 
-  test('should delete oldest files when MAX_AUDIO_SIZE_MB is exceeded', () => {
+  test('should delete oldest files by pub_date when MAX_AUDIO_SIZE_MB is exceeded', () => {
     process.env.MAX_AUDIO_SIZE_MB = '0.000001' // Very small limit (~1 byte)
-    
+
     const file1 = path.join(AUDIO_DIR, 'test-1.wav')
     const file2 = path.join(AUDIO_DIR, 'test-2.wav')
-    
-    fs.writeFileSync(file1, 'content with some length') // approx 20 bytes
-    const now = Date.now()
-    fs.utimesSync(file1, new Date(now - 2000), new Date(now - 2000))
 
-    fs.writeFileSync(file2, 'short')
-    fs.utimesSync(file2, new Date(now - 1000), new Date(now - 1000))
+    fs.writeFileSync(file1, 'content with some length') // approx 24 bytes, older
+    db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?,?,?,?,?,?)')
+      .run('1', 'T1', 'L1', 'Mon, 01 Jan 2024 00:00:00 GMT', 'C1', file1)
+
+    fs.writeFileSync(file2, 'short') // newer
+    db.prepare('INSERT INTO articles (id, title, link, pub_date, content, audio_path) VALUES (?,?,?,?,?,?)')
+      .run('2', 'T2', 'L2', 'Wed, 01 Jan 2025 00:00:00 GMT', 'C2', file2)
 
     cleanupStorage()
-    
-    // Since limit is ~1 byte, it should delete files until it's under or empty.
-    // In our logic: if exceedsSize, break loop when NOT exceeding.
-    // Actually our logic: if (!exceedsCount && !exceedsSize) break.
-    // So if it's 20 bytes and limit is 1 byte, it deletes file1.
-    // Remaining is file2 (5 bytes), still > 1 byte, so it deletes file2 too.
-    
+
+    // Both exceed the tiny limit, so both get deleted
     expect(fs.existsSync(file1)).toBe(false)
     expect(fs.existsSync(file2)).toBe(false)
   })
