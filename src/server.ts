@@ -4,6 +4,9 @@ import { join } from 'path'
 import { db } from './database/db'
 import { statSync, existsSync } from 'fs'
 import { textToAudio } from './tts'
+import { createLogger } from './logger'
+
+const logger = createLogger('Server')
 
 const app = express()
 const port = process.env['PORT'] || 3000
@@ -59,7 +62,7 @@ app.get('/rss', (req, res) => {
         const stats = statSync(join(DATA_DIR, 'unavailable.wav'))
         fileSize = stats.size
       } catch (err) {
-        console.warn('Could not get size for unavailable.wav:', err)
+        logger.warn('Could not get size for unavailable.wav:', err)
       }
     } else {
       const audioFileName = article.audio_path!.split(/[/\\]/).pop()
@@ -69,7 +72,7 @@ app.get('/rss', (req, res) => {
         const stats = statSync(article.audio_path!)
         fileSize = stats.size
       } catch (err) {
-        console.warn(`Could not get file size for ${article.audio_path}:`, err)
+        logger.warn(`Could not get file size for ${article.audio_path}:`, err)
       }
     }
 
@@ -101,14 +104,14 @@ export async function startServer() {
   }
 
   return app.listen(port, () => {
-    console.log(`Server started at http://localhost:${port}`)
-    console.log(`Podcast RSS feed available at http://localhost:${port}/rss`)
+    logger.log(`Server started at http://localhost:${port}`)
+    logger.log(`Podcast RSS feed available at http://localhost:${port}/rss`)
   })
 }
 
 if (require.main === module) {
   startServer().catch(err => {
-    console.error('Fatal error starting server:', err)
+    logger.error('Fatal error starting server:', err)
     process.exit(1)
   })
 }
@@ -118,10 +121,10 @@ async function generateUnavailableAudio(): Promise<void> {
   const filePath = join(AUDIO_DIR, 'unavailable.wav')
 
   try {
-    console.log('Generating unavailable audio...')
+    logger.log('Generating unavailable audio...')
     await textToAudio('unavailable', message, filePath)
-    console.log(`Unavailable audio generated at: ${filePath}`)
+    logger.log(`Unavailable audio generated at: ${filePath}`)
   } catch (err) {
-    console.error('Failed to generate unavailable audio:', err)
+    logger.error('Failed to generate unavailable audio:', err)
   }
 }

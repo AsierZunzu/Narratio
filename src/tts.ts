@@ -1,6 +1,9 @@
 import { join } from 'path'
 import { writeFileSync, existsSync, mkdirSync } from 'fs'
 import { Socket } from 'net'
+import { createLogger } from './logger'
+
+const logger = createLogger('TTS')
 
 const DATA_DIR = join(process.cwd(), 'data')
 const AUDIO_DIR = join(DATA_DIR, 'audio')
@@ -78,7 +81,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
     }, TIMEOUT_MS)
 
     client.connect(PIPER_PORT, PIPER_HOST, () => {
-      console.log('Connected to Piper server')
+      logger.log('Connected to Piper')
 
       const event = JSON.stringify({
         type: 'synthesize',
@@ -111,9 +114,9 @@ export async function textToAudio(id: string, text: string, customPath?: string)
                 sampleRate = audioInfo.rate ?? sampleRate
                 sampleWidth = audioInfo.width ?? sampleWidth
                 channels = audioInfo.channels ?? channels
-                console.log(`Audio format: ${sampleRate}Hz, ${sampleWidth * 8}bit, ${channels}ch`)
+                logger.log(`Audio format: ${sampleRate}Hz, ${sampleWidth * 8}bit, ${channels}ch`)
               } catch {
-                console.warn('Could not parse audio-start data block')
+                logger.warn('Could not parse audio-start data block')
               }
             } else if (resolvedType === 'error') {
               clearTimeout(timeout)
@@ -141,8 +144,8 @@ export async function textToAudio(id: string, text: string, customPath?: string)
             header = JSON.parse(headerStr) as WyomingHeader
           } catch (err) {
             // Log as hex so we can see exactly what bytes arrived
-            console.error('Failed to parse Wyoming header (hex):', Buffer.from(headerStr, 'utf8').toString('hex'))
-            console.error('Failed to parse Wyoming header (text):', JSON.stringify(headerStr))
+            logger.error('Failed to parse Wyoming header (hex):', Buffer.from(headerStr, 'utf8').toString('hex'))
+            logger.error('Failed to parse Wyoming header (text):', JSON.stringify(headerStr))
             continue
           }
 
@@ -163,9 +166,9 @@ export async function textToAudio(id: string, text: string, customPath?: string)
                 sampleRate = audioInfo.rate ?? sampleRate
                 sampleWidth = audioInfo.width ?? sampleWidth
                 channels = audioInfo.channels ?? channels
-                console.log(`Audio format: ${sampleRate}Hz, ${sampleWidth * 8}bit, ${channels}ch`)
+                logger.log(`Audio format: ${sampleRate}Hz, ${sampleWidth * 8}bit, ${channels}ch`)
               } catch {
-                console.warn('Could not parse audio-start data block')
+                logger.warn('Could not parse audio-start data block')
               }
             }
 
@@ -187,7 +190,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
               return
             }
             writeFileSync(audioPath, buildWav(audioData, sampleRate, sampleWidth, channels))
-            console.log('Audio file stored at:', audioPath, `(${audioData.length} PCM bytes)`)
+            logger.log(`Audio stored: ${audioPath} (${audioData.length} PCM bytes)`)
             settle(() => resolve(audioPath))
             return
           } else if (header.type === 'error') {
@@ -242,7 +245,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
       // but write the file rather than silently losing the audio).
       writeFileSync(audioPath, buildWav(audioData, sampleRate, sampleWidth, channels))
       client.destroy()
-      console.log('Audio file stored at:', audioPath, `(${audioData.length} PCM bytes)`)
+      console.log(`[TTS] Audio stored: ${audioPath} (${audioData.length} PCM bytes)`)
       settle(() => resolve(audioPath))
     })
 
