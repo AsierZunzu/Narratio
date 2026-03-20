@@ -142,7 +142,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
           let header: WyomingHeader
           try {
             header = JSON.parse(headerStr) as WyomingHeader
-          } catch (_err) {
+          } catch {
             // Log as hex so we can see exactly what bytes arrived
             logger.error('Failed to parse Wyoming header (hex):', Buffer.from(headerStr, 'utf8').toString('hex'))
             logger.error('Failed to parse Wyoming header (text):', JSON.stringify(headerStr))
