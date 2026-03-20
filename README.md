@@ -58,6 +58,7 @@ Alternatively, you can manually delete the contents of the `data/` directory and
 - `NODE_ENV`: Set to `production` for optimized execution.
 - `TTS_TIMEOUT`: Timeout for the TTS engine in seconds (default: `300`).
 - `TTS_MAX_RETRIES`: Maximum number of times to retry TTS generation for a failed article on subsequent polls (default: `3`). Set to `0` to disable retries.
+- `RSS_FETCH_TIMEOUT`: Timeout for fetching the RSS feed in milliseconds (default: `30000`).
 
 ### Server Configuration
 - `PORT`: The port the web server will listen on (default: `3000`).
