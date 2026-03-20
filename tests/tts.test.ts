@@ -306,7 +306,7 @@ describe('TTS Service', () => {
 
     const audioPath = await promise
     expect(errorSpy).toHaveBeenCalledWith(
-      'Failed to parse Wyoming header (hex):', expect.any(String)
+      '[TTS] Failed to parse Wyoming header (hex):', expect.any(String)
     )
     expect(writtenFiles.has(audioPath)).toBe(true)
     errorSpy.mockRestore()
@@ -322,7 +322,7 @@ describe('TTS Service', () => {
     dataHandler(Buffer.concat([Buffer.from(header + '\n'), badData, wyomingAudioChunk(pcm), wyomingAudioStop()]))
 
     const audioPath = await promise
-    expect(warnSpy).toHaveBeenCalledWith('Could not parse audio-start data block')
+    expect(warnSpy).toHaveBeenCalledWith('[TTS] Could not parse audio-start data block')
     expect(writtenFiles.has(audioPath)).toBe(true)
     warnSpy.mockRestore()
   })
@@ -338,7 +338,7 @@ describe('TTS Service', () => {
     dataHandler(Buffer.concat([badData, wyomingAudioChunk(pcm), wyomingAudioStop()]))
 
     const audioPath = await promise
-    expect(warnSpy).toHaveBeenCalledWith('Could not parse audio-start data block')
+    expect(warnSpy).toHaveBeenCalledWith('[TTS] Could not parse audio-start data block')
     expect(writtenFiles.has(audioPath)).toBe(true)
     warnSpy.mockRestore()
   })

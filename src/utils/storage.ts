@@ -1,6 +1,9 @@
 import { readdirSync, statSync, unlinkSync, existsSync } from 'fs'
 import { join, basename } from 'path'
 import { db } from '../database/db'
+import { createLogger } from '../logger'
+
+const logger = createLogger('Storage')
 
 const DATA_DIR = join(process.cwd(), 'data')
 const AUDIO_DIR = join(DATA_DIR, 'audio')
@@ -14,9 +17,9 @@ export function deleteAllAudioFiles(): void {
     const filePath = join(AUDIO_DIR, file)
     try {
       unlinkSync(filePath)
-      console.log(`- Force reset: Removed audio file ${file}`)
+      logger.log(`Force reset: Removed audio file ${file}`)
     } catch (err) {
-      console.error(`- Force reset: Failed to remove ${file}:`, err)
+      logger.error(`Force reset: Failed to remove ${file}:`, err)
     }
   }
 }
@@ -55,13 +58,13 @@ export function cleanupStorage(): void {
       unlinkSync(article.path)
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(`- Storage cleanup: Failed to remove ${basename(article.path)}:`, err)
+        logger.error(`Storage cleanup: Failed to remove ${basename(article.path)}:`, err)
         continue
       }
     }
     updateDb.run(article.id)
     currentCount--
     currentSize -= article.size
-    console.log(`- Storage cleanup: Removed oldest file ${basename(article.path)}`)
+    logger.log(`Storage cleanup: Removed oldest file ${basename(article.path)}`)
   }
 }

@@ -107,7 +107,7 @@ describe('GET /rss', () => {
     setupDb([{ id: '1', title: 'Purged', link: 'L', pub_date: 'D', content: 'C', audio_path: null, is_purged: 1 }])
     const res = await request(app).get('/rss')
     expect(res.status).toBe(200)
-    expect(warnSpy).toHaveBeenCalledWith('Could not get size for unavailable.wav:', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Could not get size for unavailable.wav:'), expect.any(Error))
     warnSpy.mockRestore()
   })
 
@@ -177,7 +177,7 @@ describe('startServer', () => {
     mockTextToAudio.mockRejectedValueOnce(new Error('TTS connection refused'))
     const errorSpy = jest.spyOn(console, 'error').mockImplementation()
     await startServer()
-    expect(errorSpy).toHaveBeenCalledWith('Failed to generate unavailable audio:', expect.any(Error))
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to generate unavailable audio:'), expect.any(Error))
     expect(listenSpy).toHaveBeenCalled()
   })
 })

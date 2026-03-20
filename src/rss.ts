@@ -3,6 +3,9 @@ import { db as defaultDb } from './database/db'
 import { Database as BetterSqlite3Database } from 'better-sqlite3'
 import { textToAudio } from './tts'
 import { convert } from 'html-to-text'
+import { createLogger } from './logger'
+
+const logger = createLogger('RSS')
 
 type CustomItem = {
   contentEncoded?: string
@@ -47,13 +50,13 @@ async function retryFailedArticles(db: BetterSqlite3Database): Promise<void> {
 
   for (const article of eligible) {
     const retryNum = (db.prepare('SELECT tts_retry_count FROM articles WHERE id = ?').get(article.id) as { tts_retry_count: number }).tts_retry_count
-    console.log(`  - Retrying TTS (attempt ${retryNum + 1}/${TTS_MAX_RETRIES}): ${article.title}`)
+    logger.log(`  Retrying TTS (attempt ${retryNum + 1}/${TTS_MAX_RETRIES}): ${article.title}`)
     try {
       const audioPath = await textToAudio(article.id.replace(/[^a-z0-9]/gi, '_'), article.content)
       updateSuccess.run(audioPath, new Date().toISOString(), article.id)
-      console.log(`  - Audio saved: ${audioPath}`)
+      logger.log(`  Audio saved: ${audioPath}`)
     } catch (ttsErr) {
-      console.error(`  - TTS retry failed for ${article.title}:`, ttsErr)
+      logger.error(`  TTS retry failed for: ${article.title}`, ttsErr)
       updateFailure.run(new Date().toISOString(), ttsErr instanceof Error ? ttsErr.message : String(ttsErr), article.id)
     }
   }
@@ -62,9 +65,9 @@ async function retryFailedArticles(db: BetterSqlite3Database): Promise<void> {
 export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser<Record<string, never>, CustomItem>) {
   const p = customParser || parser
   try {
-    console.log(`Fetching feed from: ${url}`)
+    logger.log(`Fetching feed: ${url}`)
     const feed = await p.parseURL(url)
-    console.log(`Processing feed: ${feed.title}`)
+    logger.log(`Processing feed: ${feed.title}`)
 
     const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content) VALUES (?, ?, ?, ?, ?)')
     const updateSuccess = db.prepare(`
@@ -101,29 +104,29 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
 
       try {
         insert.run(id, title, link, pubDate, humanContent)
-        console.log(`- New article: ${title}`)
+        logger.log(`New article: ${title}`)
 
         // Trigger TTS for the new article
         try {
-          console.log('  - Generating audio...')
+          logger.log(`  Generating audio for: ${title}`)
           const audioPath = await textToAudio(id.replace(/[^a-z0-9]/gi, '_'), text)
           updateSuccess.run(audioPath, new Date().toISOString(), id)
-          console.log(`  - Audio saved: ${audioPath}`)
+          logger.log(`  Audio saved: ${audioPath}`)
         } catch (ttsErr) {
-          console.error(`  - TTS failed for ${title}:`, ttsErr)
+          logger.error(`  TTS failed for: ${title}`, ttsErr)
           updateFailure.run(new Date().toISOString(), ttsErr instanceof Error ? ttsErr.message : String(ttsErr), id)
         }
       } catch (err) {
         if (err instanceof Error && (err as { code?: string }).code === 'SQLITE_CONSTRAINT_PRIMARYKEY') {
           // Article already exists, skipping
         } else {
-          console.error(`- Error inserting article ${title}:`, err)
+          logger.error(`Error inserting article: ${title}`, err)
         }
       }
     }
 
     await retryFailedArticles(db)
   } catch (err) {
-    console.error(`Error parsing feed from ${url}:`, err)
+    logger.error(`Error parsing feed from ${url}:`, err)
   }
 }
