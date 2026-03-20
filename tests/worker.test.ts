@@ -14,6 +14,9 @@ jest.mock('../src/utils/url', () => ({
   isValidURL: jest.fn().mockReturnValue(true),
   checkReachability: jest.fn().mockResolvedValue(true),
 }))
+jest.mock('../src/utils/storage', () => ({
+  deleteAllAudioFiles: jest.fn(),
+}))
 jest.mock('../src/database/db', () => ({
   db: {
     prepare: jest.fn().mockReturnValue({
