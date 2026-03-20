@@ -1,5 +1,7 @@
 # RSS-to-Podcast
 
+> **Personal project** — built for self-use and as a testbed for exploring different AI-assisted programming techniques and tools. Shared as-is with no guarantees of stability, support, or general-purpose usability.
+
 RSS-to-Podcast is a TypeScript-based application that periodically fetches articles from RSS feeds, converts them into natural-sounding audio files using the Piper TTS engine, and serves them as a valid Podcast RSS feed compatible with services like Pinepods.
 
 ## Prerequisites
