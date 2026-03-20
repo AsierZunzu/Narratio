@@ -57,7 +57,9 @@ The whole operation is wrapped in a `TTS_TIMEOUT` (env var, default 30s) promise
 
 
 ## General instructions
-- All new code should be created with tests
-- Check if the README requires updates after each change
-- Commands should be run in Powershell
+- After each change, check:
+  - The README is up to date
+  - The code is linted
+  - The tests are passing
+  - Tests for new functionalities have been added
 - Use relative paths on commands
