@@ -1,5 +1,5 @@
 services:
-  podcastyfy-server:
+  narratio-server:
     build: .
     container_name: server
     ports:
@@ -10,9 +10,9 @@ services:
       - NODE_ENV=production
       - PIPER_HOST=piper
       - PIPER_PORT=10200
-      - PODCAST_TITLE=RSS to Podcast
+      - PODCAST_TITLE=Narratio
       - PODCAST_DESCRIPTION=Automatically generated podcast from RSS feeds
-      - PODCAST_AUTHOR=RSS to Podcast Worker
+      - PODCAST_AUTHOR=Narratio Worker
       - PODCAST_LANGUAGE=en
       - PODCAST_ITUNES_CATEGORY=Technology
       - PODCAST_ITUNES_OWNER_EMAIL=worker@example.com
@@ -22,7 +22,7 @@ services:
         condition: service_healthy
     command: ["npm", "run", "start:server"]
 
-  podcastyfy-worker:
+  narratio-worker:
     build: .
     container_name: worker
     volumes:

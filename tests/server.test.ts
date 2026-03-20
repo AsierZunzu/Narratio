@@ -51,7 +51,7 @@ describe('GET /rss', () => {
   test('uses default title when PODCAST_TITLE is not set', async () => {
     setupDb([])
     const res = await request(app).get('/rss')
-    expect(res.text).toContain('<title><![CDATA[RSS to Podcast]]></title>')
+    expect(res.text).toContain('<title><![CDATA[Narratio]]></title>')
   })
 
   test('uses PODCAST_TITLE env var when set', async () => {

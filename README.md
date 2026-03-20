@@ -1,8 +1,8 @@
-# RSS-to-Podcast
+# Narratio
 
 > **Personal project** — built for self-use and as a testbed for exploring different AI-assisted programming techniques and tools. Shared as-is with no guarantees of stability, support, or general-purpose usability.
 
-RSS-to-Podcast is a TypeScript-based application that periodically fetches articles from RSS feeds, converts them into natural-sounding audio files using the Piper TTS engine, and serves them as a valid Podcast RSS feed compatible with services like Pinepods.
+Narratio is a TypeScript-based application that periodically fetches articles from RSS feeds, converts them into natural-sounding audio files using the Piper TTS engine, and serves them as a valid Podcast RSS feed compatible with services like Pinepods.
 
 ## Prerequisites
 
@@ -62,9 +62,9 @@ Alternatively, you can manually delete the contents of the `data/` directory and
 
 ### Server Configuration
 - `PORT`: The port the web server will listen on (default: `3000`).
-- `PODCAST_TITLE`: Title of your generated podcast (default: `RSS to Podcast`).
+- `PODCAST_TITLE`: Title of your generated podcast (default: `Narratio`).
 - `PODCAST_DESCRIPTION`: Description of your podcast (default: dynamic based on feed URL).
-- `PODCAST_AUTHOR`: Author name for the podcast (default: `RSS to Podcast Worker`).
+- `PODCAST_AUTHOR`: Author name for the podcast (default: `Narratio Worker`).
 - `PODCAST_LANGUAGE`: Language code (default: `en`).
 - `PODCAST_ITUNES_AUTHOR`: iTunes-specific author name (defaults to `PODCAST_AUTHOR`).
 - `PODCAST_ITUNES_SUMMARY`: iTunes-specific summary (defaults to `PODCAST_DESCRIPTION`).
