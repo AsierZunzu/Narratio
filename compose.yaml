@@ -1,6 +1,7 @@
 services:
   narratio-server:
-    build: .
+    image: ghcr.io/asierzunzu/narratio:latest
+#    build: .
     container_name: server
     ports:
       - "3000:3000"
@@ -23,7 +24,8 @@ services:
     command: ["npm", "run", "start:server"]
 
   narratio-worker:
-    build: .
+    image: ghcr.io/asierzunzu/narratio:latest
+#    build: .
     container_name: worker
     volumes:
       - ./data/app:/app/data
