@@ -1,5 +1,5 @@
 {
-  "name": "rss-to-podcast",
+  "name": "narratio",
   "version": "1.0.0",
   "description": "",
   "main": "dist/server.js",

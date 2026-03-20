@@ -35,16 +35,16 @@ app.get('/rss', (req, res) => {
   const defaultDescription = storedUrlRow ? `Automatically generated podcast from ${storedUrlRow.value}` : 'Automatically generated podcast from RSS feeds'
 
   const podcast = new Podcast({
-    title: process.env['PODCAST_TITLE'] || 'RSS to Podcast',
+    title: process.env['PODCAST_TITLE'] || 'Narratio',
     description: process.env['PODCAST_DESCRIPTION'] || defaultDescription,
     feedUrl: feedUrl,
     siteUrl: siteUrl,
-    author: process.env['PODCAST_AUTHOR'] || 'RSS to Podcast Worker',
+    author: process.env['PODCAST_AUTHOR'] || 'Narratio Worker',
     language: process.env['PODCAST_LANGUAGE'] || 'en',
-    itunesAuthor: process.env['PODCAST_ITUNES_AUTHOR'] || process.env['PODCAST_AUTHOR'] || 'RSS to Podcast Worker',
+    itunesAuthor: process.env['PODCAST_ITUNES_AUTHOR'] || process.env['PODCAST_AUTHOR'] || 'Narratio Worker',
     itunesSummary: process.env['PODCAST_ITUNES_SUMMARY'] || process.env['PODCAST_DESCRIPTION'] || defaultDescription,
     itunesOwner: {
-      name: process.env['PODCAST_ITUNES_OWNER_NAME'] || process.env['PODCAST_AUTHOR'] || 'RSS to Podcast Worker',
+      name: process.env['PODCAST_ITUNES_OWNER_NAME'] || process.env['PODCAST_AUTHOR'] || 'Narratio Worker',
       email: process.env['PODCAST_ITUNES_OWNER_EMAIL'] || 'worker@example.com'
     },
     itunesCategory: [{ text: process.env['PODCAST_ITUNES_CATEGORY'] || 'Technology' }],

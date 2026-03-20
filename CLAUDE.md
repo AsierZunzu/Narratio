@@ -14,7 +14,7 @@ npx jest tests/tts.test.ts  # Run a single test file
 
 ## Architecture
 
-RSS-to-Podcast converts RSS feeds into podcast feeds with generated audio. It has two independent processes sharing a SQLite database and a filesystem volume:
+Narratio converts RSS feeds into podcast feeds with generated audio. It has two independent processes sharing a SQLite database and a filesystem volume:
 
 - **Worker** (`src/worker.ts`) — Polls an RSS feed on a cron schedule, extracts article text (HTML→plain text via `html-to-text`), generates audio via TTS, and stores results in SQLite.
 - **Server** (`src/server.ts`) — Express app that serves generated WAV files as static assets and exposes a `/rss` endpoint that builds podcast-compatible XML from the database.
