@@ -3,8 +3,8 @@ import { Podcast } from 'podcast'
 import { join } from 'path'
 import { db } from './database/db'
 import { statSync, existsSync } from 'fs'
-import { textToAudio } from './tts'
-import { createLogger } from './logger'
+import { textToAudio } from './services/tts'
+import { createLogger } from './utils/logger'
 
 const logger = createLogger('Server')
 

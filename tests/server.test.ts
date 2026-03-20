@@ -4,7 +4,7 @@ jest.mock('../src/database/db', () => ({
   db: { prepare: jest.fn() }
 }))
 
-jest.mock('../src/tts', () => ({
+jest.mock('../src/services/tts', () => ({
   textToAudio: jest.fn().mockResolvedValue('/app/data/audio/unavailable.wav')
 }))
 
@@ -16,7 +16,7 @@ jest.mock('fs', () => ({
 
 import { app, startServer } from '../src/server'
 import { db } from '../src/database/db'
-import { textToAudio } from '../src/tts'
+import { textToAudio } from '../src/services/tts'
 import * as fs from 'fs'
 
 const mockPrepare = db.prepare as jest.Mock

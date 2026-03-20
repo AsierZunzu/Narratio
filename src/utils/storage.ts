@@ -1,7 +1,7 @@
 import { readdirSync, statSync, unlinkSync, existsSync } from 'fs'
 import { join, basename } from 'path'
 import { db } from '../database/db'
-import { createLogger } from '../logger'
+import { createLogger } from './logger'
 
 const logger = createLogger('Storage')
 
