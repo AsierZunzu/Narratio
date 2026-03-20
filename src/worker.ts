@@ -84,7 +84,16 @@ export async function main() {
     // Run immediately on start
     await runWorkerTask(feedUrl)
 
-    cron.schedule(pollInterval, () => runWorkerTask(feedUrl))
+    const task = cron.schedule(pollInterval, () => runWorkerTask(feedUrl))
+
+    const shutdown = (signal: string) => {
+      logger.log(`Received ${signal}, shutting down...`)
+      task.stop()
+      db.close()
+      process.exit(0)
+    }
+    process.once('SIGTERM', () => shutdown('SIGTERM'))
+    process.once('SIGINT', () => shutdown('SIGINT'))
 
     logger.log('Active and waiting for next scheduled run.')
   } else {

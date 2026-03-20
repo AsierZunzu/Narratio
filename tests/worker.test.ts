@@ -1,11 +1,12 @@
 import cron from 'node-cron'
 import { parseRSSFeed } from '../src/rss'
 import { main } from '../src/worker'
+import { db } from '../src/database/db'
 
 // Mocking dependencies
 jest.mock('node-cron', () => ({
   validate: jest.fn().mockReturnValue(true),
-  schedule: jest.fn(),
+  schedule: jest.fn().mockReturnValue({ stop: jest.fn() }),
 }))
 jest.mock('../src/rss', () => ({
   parseRSSFeed: jest.fn().mockResolvedValue(undefined),
@@ -23,6 +24,7 @@ jest.mock('../src/database/db', () => ({
       get: jest.fn().mockReturnValue(undefined),
       run: jest.fn(),
     }),
+    close: jest.fn(),
   },
   resetDatabase: jest.fn(),
 }))
@@ -33,6 +35,9 @@ describe('Worker Cron Scheduling', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    // Re-establish default return values (clearAllMocks does not reset implementations)
+    ;(cron.validate as jest.Mock).mockReturnValue(true)
+    ;(cron.schedule as jest.Mock).mockReturnValue({ stop: jest.fn() })
     originalEnv = { ...process.env }
     originalArgv = [...process.argv]
     // Prevent process.exit in tests
@@ -46,6 +51,8 @@ describe('Worker Cron Scheduling', () => {
   afterEach(() => {
     process.env = originalEnv
     process.argv = originalArgv
+    process.removeAllListeners('SIGTERM')
+    process.removeAllListeners('SIGINT')
     jest.restoreAllMocks()
   })
 
@@ -53,7 +60,7 @@ describe('Worker Cron Scheduling', () => {
     delete process.env.POLL_INTERVAL
     process.env.RSS_URL = 'http://example.com/rss'
     process.argv = ['node', 'worker.js']
-    
+
     await main()
 
     expect(parseRSSFeed).toHaveBeenCalledTimes(1)
@@ -64,7 +71,7 @@ describe('Worker Cron Scheduling', () => {
     process.env.POLL_INTERVAL = '*/5 * * * *'
     process.env.RSS_URL = 'http://example.com/rss'
     process.argv = ['node', 'worker.js']
-    
+
     await main()
 
     expect(parseRSSFeed).toHaveBeenCalledTimes(1) // Run once on startup
@@ -75,10 +82,42 @@ describe('Worker Cron Scheduling', () => {
     process.env.POLL_INTERVAL = 'invalid'
     process.env.RSS_URL = 'http://example.com/rss'
     process.argv = ['node', 'worker.js']
-    
+
     ;(cron.validate as jest.Mock).mockReturnValue(false)
 
     await expect(main()).rejects.toThrow('process.exit called with code 1')
     expect(cron.schedule).not.toHaveBeenCalled()
+  })
+
+  it('should register SIGTERM and SIGINT handlers in cron mode', async () => {
+    process.env.POLL_INTERVAL = '*/5 * * * *'
+    process.env.RSS_URL = 'http://example.com/rss'
+    process.argv = ['node', 'worker.js']
+
+    const sigtermBefore = process.listenerCount('SIGTERM')
+    const sigintBefore = process.listenerCount('SIGINT')
+
+    await main()
+
+    expect(process.listenerCount('SIGTERM')).toBe(sigtermBefore + 1)
+    expect(process.listenerCount('SIGINT')).toBe(sigintBefore + 1)
+  })
+
+  it('should stop cron task and close db on SIGTERM', async () => {
+    process.env.POLL_INTERVAL = '*/5 * * * *'
+    process.env.RSS_URL = 'http://example.com/rss'
+    process.argv = ['node', 'worker.js']
+
+    await main()
+
+    const mockTask = (cron.schedule as jest.Mock).mock.results[0].value
+    const exitSpy = process.exit as unknown as jest.Mock
+
+    // process.exit(0) throws in the test environment — catch it and verify the calls made before it
+    try { process.emit('SIGTERM') } catch { /* expected */ }
+
+    expect(mockTask.stop).toHaveBeenCalled()
+    expect((db as any).close).toHaveBeenCalled()
+    expect(exitSpy).toHaveBeenCalledWith(0)
   })
 })
