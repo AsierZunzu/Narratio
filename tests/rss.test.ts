@@ -179,6 +179,25 @@ describe('RSS Parsing', () => {
     expect(updateFailureMock.run).not.toHaveBeenCalled()
   })
 
+  test('should skip articles with no identifiable ID', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const mockFeed = {
+      title: 'Test Feed',
+      items: [
+        { guid: undefined, link: undefined, title: undefined }, // all falsy
+        { guid: 'valid', title: 'Valid Article', contentSnippet: 'Content' }
+      ]
+    }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(insertMock.run).toHaveBeenCalledTimes(1)
+    expect(insertMock.run).toHaveBeenCalledWith('valid', expect.any(String), expect.any(String), expect.any(String), expect.any(String))
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping article with no identifiable ID'))
+    consoleSpy.mockRestore()
+  })
+
   test('should timeout if RSS feed fetch exceeds RSS_FETCH_TIMEOUT', async () => {
     jest.useFakeTimers()
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation()

@@ -114,6 +114,11 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
       })
       const text = `${title} \n\n\n ${humanContent}`
 
+      if (!id) {
+        logger.log(`Skipping article with no identifiable ID (title: "${title}")`)
+        continue
+      }
+
       try {
         insert.run(id, title, link, pubDate, humanContent)
         logger.log(`New article: ${title}`)
@@ -138,6 +143,7 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
     }
 
     await retryFailedArticles(db)
+    cleanupStorage()
   } catch (err) {
     clearTimeout(fetchTimeoutId)
     logger.error(`Error parsing feed from ${url}:`, err)
