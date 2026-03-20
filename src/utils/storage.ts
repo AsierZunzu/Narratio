@@ -26,47 +26,41 @@ export function cleanupStorage(): void {
   const MAX_SIZE_MB = process.env.MAX_AUDIO_SIZE_MB ? parseFloat(process.env.MAX_AUDIO_SIZE_MB) : Infinity
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
 
-  if (!MAX_FILES && !MAX_SIZE_MB) return
   if (MAX_FILES === Infinity && MAX_SIZE_MB === Infinity) return
 
-  if (!existsSync(AUDIO_DIR)) return
+  type ArticleRow = { id: string; audio_path: string; pub_date: string }
+  const rows = db.prepare(
+    'SELECT id, audio_path, pub_date FROM articles WHERE audio_path IS NOT NULL AND is_purged = 0'
+  ).all() as ArticleRow[]
 
-  const files = readdirSync(AUDIO_DIR)
-    .filter(file => file.endsWith('.wav'))
-    .map(file => {
-      const filePath = join(AUDIO_DIR, file)
-      const stats = statSync(filePath)
-      return {
-        name: file,
-        path: filePath,
-        size: stats.size,
-        mtime: stats.mtimeMs
-      }
+  const articles = rows
+    .map(row => {
+      const size = existsSync(row.audio_path) ? statSync(row.audio_path).size : 0
+      return { id: row.id, path: row.audio_path, size, pubDate: new Date(row.pub_date) }
     })
-    .sort((a, b) => a.mtime - b.mtime) // Oldest first
+    .sort((a, b) => a.pubDate.getTime() - b.pubDate.getTime()) // Oldest first
 
-  let currentCount = files.length
-  let currentSize = files.reduce((sum, f) => sum + f.size, 0)
+  let currentCount = articles.length
+  let currentSize = articles.reduce((sum, a) => sum + a.size, 0)
 
-  const updateDb = db.prepare('UPDATE articles SET audio_path = NULL, processed_at = NULL, is_purged = 1 WHERE audio_path LIKE ?')
+  const updateDb = db.prepare('UPDATE articles SET audio_path = NULL, processed_at = NULL, is_purged = 1 WHERE id = ?')
 
-  for (const file of files) {
+  for (const article of articles) {
     const exceedsCount = currentCount > MAX_FILES
     const exceedsSize = currentSize > MAX_SIZE_BYTES
 
     if (!exceedsCount && !exceedsSize) break
 
     try {
-      unlinkSync(file.path)
-      // Update database - we search for the filename in the path
-      // Since we know they are in AUDIO_DIR, it's safer to use the full path or just the name
-      updateDb.run(`%${file.name}`)
-      
+      if (existsSync(article.path)) {
+        unlinkSync(article.path)
+      }
+      updateDb.run(article.id)
       currentCount--
-      currentSize -= file.size
-      console.log(`- Storage cleanup: Removed oldest file ${file.name}`)
+      currentSize -= article.size
+      console.log(`- Storage cleanup: Removed oldest file ${article.path}`)
     } catch (err) {
-      console.error(`- Storage cleanup: Failed to remove ${file.name}:`, err)
+      console.error(`- Storage cleanup: Failed to remove ${article.path}:`, err)
     }
   }
 }
