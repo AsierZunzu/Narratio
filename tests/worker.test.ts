@@ -20,13 +20,11 @@ jest.mock('../src/utils/storage', () => ({
 }))
 jest.mock('../src/database/db', () => ({
   db: {
-    prepare: jest.fn().mockReturnValue({
-      get: jest.fn().mockReturnValue(undefined),
-      run: jest.fn(),
-    }),
+    getFeedUrl: jest.fn().mockReturnValue(undefined),
+    setFeedUrl: jest.fn(),
+    reset: jest.fn(),
     close: jest.fn(),
   },
-  resetDatabase: jest.fn(),
 }))
 
 describe('Worker Cron Scheduling', () => {

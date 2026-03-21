@@ -31,12 +31,7 @@ export function cleanupStorage(): void {
 
   if (MAX_FILES === Infinity && MAX_SIZE_MB === Infinity) return
 
-  type ArticleRow = { id: string; audio_path: string; pub_date: string }
-  const rows = db.prepare(
-    'SELECT id, audio_path, pub_date FROM articles WHERE audio_path IS NOT NULL AND is_purged = 0'
-  ).all() as ArticleRow[]
-
-  const articles = rows
+  const articles = db.getActiveAudioArticles()
     .map(row => {
       const size = existsSync(row.audio_path) ? statSync(row.audio_path).size : 0
       return { id: row.id, path: row.audio_path, size, pubDate: new Date(row.pub_date) }
@@ -45,8 +40,6 @@ export function cleanupStorage(): void {
 
   let currentCount = articles.length
   let currentSize = articles.reduce((sum, a) => sum + a.size, 0)
-
-  const updateDb = db.prepare('UPDATE articles SET audio_path = NULL, processed_at = NULL, is_purged = 1 WHERE id = ?')
 
   for (const article of articles) {
     const exceedsCount = currentCount > MAX_FILES
@@ -62,7 +55,7 @@ export function cleanupStorage(): void {
         continue
       }
     }
-    updateDb.run(article.id)
+    db.markArticlePurged(article.id)
     currentCount--
     currentSize -= article.size
     logger.log(`Storage cleanup: Removed oldest file ${basename(article.path)}`)

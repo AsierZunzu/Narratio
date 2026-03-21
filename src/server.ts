@@ -1,7 +1,7 @@
 import express from 'express'
 import { Podcast } from 'podcast'
 import { join } from 'path'
-import { db } from './database/db'
+import { db, PublishedArticle } from './database/db'
 import { statSync, existsSync } from 'fs'
 import { textToAudio } from './services/tts'
 import { createLogger } from './utils/logger'
@@ -17,24 +17,13 @@ const AUDIO_DIR = join(DATA_DIR, 'audio')
 app.use('/audio', express.static(AUDIO_DIR))
 app.use('/audio/unavailable.wav', express.static(join(DATA_DIR, 'unavailable.wav')))
 
-interface Article {
-  id: string;
-  title: string;
-  link: string;
-  pub_date: string;
-  content: string;
-  audio_path: string | null;
-  is_purged: number;
-  image_url: string | null;
-}
-
 app.get('/rss', (req, res) => {
   const feedUrl = `${req.protocol}://${req.get('host')}/rss`
   const siteUrl = `${req.protocol}://${req.get('host')}`
 
-  const storedUrlRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_url\'').get() as { value: string } | undefined
-  const feedImageRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_image_url\'').get() as { value: string } | undefined
-  const defaultDescription = storedUrlRow ? `Automatically generated podcast from ${storedUrlRow.value}` : 'Automatically generated podcast from RSS feeds'
+  const storedFeedUrl = db.getFeedUrl()
+  const feedImageUrl = db.getFeedImageUrl()
+  const defaultDescription = storedFeedUrl ? `Automatically generated podcast from ${storedFeedUrl}` : 'Automatically generated podcast from RSS feeds'
 
   const podcast = new Podcast({
     title: process.env['PODCAST_TITLE'] || 'Narratio',
@@ -50,12 +39,12 @@ app.get('/rss', (req, res) => {
       email: process.env['PODCAST_ITUNES_OWNER_EMAIL'] || 'worker@example.com'
     },
     itunesCategory: [{ text: process.env['PODCAST_ITUNES_CATEGORY'] || 'Technology' }],
-    imageUrl: feedImageRow?.value,
+    imageUrl: feedImageUrl,
   })
 
-  const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC').all() as Article[]
+  const articles = db.getPublishedArticles()
 
-  articles.forEach(article => {
+  articles.forEach((article: PublishedArticle) => {
     let audioUrl: string
     let fileSize = 0
 
