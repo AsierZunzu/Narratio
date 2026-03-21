@@ -62,7 +62,7 @@ describe('RSS Parsing', () => {
     expect(mockParser.parseURL).toHaveBeenCalledWith('http://test-feed.com')
     expect(mockDb.insertArticle).toHaveBeenCalledTimes(2)
     expect(mockDb.markArticleAudioSuccess).toHaveBeenCalledTimes(2)
-    expect(mockDb.insertArticle).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1', null)
+    expect(mockDb.insertArticle).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01T00:00:00.000Z', 'Content 1', null)
     expect(mockDb.markArticleAudioSuccess).toHaveBeenCalledWith('1', '/app/data/audio/test.wav')
   })
 
@@ -235,7 +235,7 @@ describe('RSS Parsing', () => {
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(mockDb.insertArticle).toHaveBeenCalledWith(
-      '1', 'Article', 'http://example.com/1', '2023-01-01', 'Content', 'http://example.com/article.jpg'
+      '1', 'Article', 'http://example.com/1', '2023-01-01T00:00:00.000Z', 'Content', 'http://example.com/article.jpg'
     )
   })
 
@@ -253,7 +253,7 @@ describe('RSS Parsing', () => {
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(mockDb.insertArticle).toHaveBeenCalledWith(
-      '2', 'Article', 'http://example.com/2', '2023-01-01', expect.any(String), 'http://example.com/img.jpg'
+      '2', 'Article', 'http://example.com/2', '2023-01-01T00:00:00.000Z', expect.any(String), 'http://example.com/img.jpg'
     )
   })
 
@@ -266,6 +266,6 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(mockDb.insertArticle).toHaveBeenCalledWith('3', 'Article', 'http://example.com/3', '2023-01-01', 'No images here', null)
+    expect(mockDb.insertArticle).toHaveBeenCalledWith('3', 'Article', 'http://example.com/3', '2023-01-01T00:00:00.000Z', 'No images here', null)
   })
 })
