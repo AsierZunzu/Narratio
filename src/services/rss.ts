@@ -90,7 +90,7 @@ export async function parseRSSFeed(url: string, db: PodcastDatabase = defaultDb,
       const id = item.guid || item.link || item.title || ''
       const title = item.title || 'No Title'
       const link = item.link || ''
-      const pubDate = item.pubDate || new Date().toISOString()
+      const pubDate = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString()
       const content = item.contentEncoded || item.contentSnippet || item.content || ''
       const humanContent = convert(content, {
         selectors: [
