@@ -25,6 +25,7 @@ interface Article {
   content: string;
   audio_path: string | null;
   is_purged: number;
+  image_url: string | null;
 }
 
 app.get('/rss', (req, res) => {
@@ -32,6 +33,7 @@ app.get('/rss', (req, res) => {
   const siteUrl = `${req.protocol}://${req.get('host')}`
 
   const storedUrlRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_url\'').get() as { value: string } | undefined
+  const feedImageRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_image_url\'').get() as { value: string } | undefined
   const defaultDescription = storedUrlRow ? `Automatically generated podcast from ${storedUrlRow.value}` : 'Automatically generated podcast from RSS feeds'
 
   const podcast = new Podcast({
@@ -48,6 +50,7 @@ app.get('/rss', (req, res) => {
       email: process.env['PODCAST_ITUNES_OWNER_EMAIL'] || 'worker@example.com'
     },
     itunesCategory: [{ text: process.env['PODCAST_ITUNES_CATEGORY'] || 'Technology' }],
+    imageUrl: feedImageRow?.value,
   })
 
   const articles = db.prepare('SELECT * FROM articles WHERE audio_path IS NOT NULL OR is_purged = 1 ORDER BY pub_date DESC').all() as Article[]
@@ -86,7 +89,8 @@ app.get('/rss', (req, res) => {
         url: audioUrl,
         size: fileSize,
         type: 'audio/mpeg'
-      }
+      },
+      itunesImage: article.image_url || undefined,
     })
   })
 

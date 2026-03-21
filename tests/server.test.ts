@@ -22,8 +22,11 @@ import * as fs from 'fs'
 const mockPrepare = db.prepare as jest.Mock
 const mockTextToAudio = textToAudio as jest.Mock
 
-function setupDb(articles: object[], feedUrl?: string) {
+function setupDb(articles: object[], feedUrl?: string, feedImageUrl?: string) {
   mockPrepare.mockImplementation((query: string) => {
+    if (query.includes('feed_image_url')) {
+      return { get: jest.fn().mockReturnValue(feedImageUrl ? { value: feedImageUrl } : undefined) }
+    }
     if (query.includes('metadata')) {
       return { get: jest.fn().mockReturnValue(feedUrl ? { value: feedUrl } : undefined) }
     }
@@ -71,7 +74,7 @@ describe('GET /rss', () => {
     setupDb([{
       id: '1', title: 'Article 1', link: 'http://example.com/1',
       pub_date: '2023-01-01', content: 'Content 1',
-      audio_path: '/app/data/audio/article1.wav', is_purged: 0
+      audio_path: '/app/data/audio/article1.wav', is_purged: 0, image_url: null
     }])
     const res = await request(app).get('/rss')
     expect(res.text).toContain('<title><![CDATA[Article 1]]></title>')
@@ -85,12 +88,29 @@ describe('GET /rss', () => {
     setupDb([{
       id: '2', title: 'Article 2', link: 'http://example.com/2',
       pub_date: '2023-01-02', content: 'Content 2',
-      audio_path: null, is_purged: 1
+      audio_path: null, is_purged: 1, image_url: null
     }])
     const res = await request(app).get('/rss')
     expect(res.text).toContain('[PURGED] Article 2')
     expect(res.text).toContain('Original audio is no longer available.')
     expect(res.text).toContain('unavailable.wav')
+  })
+
+  test('includes feed image in podcast channel when feed_image_url is set', async () => {
+    setupDb([], undefined, 'http://example.com/feed.jpg')
+    const res = await request(app).get('/rss')
+    expect(res.text).toContain('feed.jpg')
+  })
+
+  test('includes article image as itunes:image when image_url is set', async () => {
+    setupDb([{
+      id: '1', title: 'Article 1', link: 'http://example.com/1',
+      pub_date: '2023-01-01', content: 'Content 1',
+      audio_path: '/app/data/audio/article1.wav', is_purged: 0,
+      image_url: 'http://example.com/article.jpg'
+    }])
+    const res = await request(app).get('/rss')
+    expect(res.text).toContain('article.jpg')
   })
 
   test('returns empty feed when no articles exist', async () => {
@@ -104,7 +124,7 @@ describe('GET /rss', () => {
   test('logs warning and uses fileSize 0 when statSync throws for purged article', async () => {
     (fs.statSync as jest.Mock).mockImplementation(() => { throw new Error('stat failed') })
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation()
-    setupDb([{ id: '1', title: 'Purged', link: 'L', pub_date: 'D', content: 'C', audio_path: null, is_purged: 1 }])
+    setupDb([{ id: '1', title: 'Purged', link: 'L', pub_date: 'D', content: 'C', audio_path: null, is_purged: 1, image_url: null }])
     const res = await request(app).get('/rss')
     expect(res.status).toBe(200)
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Could not get size for unavailable.wav:'), expect.any(Error))
@@ -114,7 +134,7 @@ describe('GET /rss', () => {
   test('logs warning and uses fileSize 0 when statSync throws for normal article', async () => {
     (fs.statSync as jest.Mock).mockImplementation(() => { throw new Error('stat failed') })
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation()
-    setupDb([{ id: '1', title: 'Article', link: 'L', pub_date: 'D', content: 'C', audio_path: '/data/audio/article.wav', is_purged: 0 }])
+    setupDb([{ id: '1', title: 'Article', link: 'L', pub_date: 'D', content: 'C', audio_path: '/data/audio/article.wav', is_purged: 0, image_url: null }])
     const res = await request(app).get('/rss')
     expect(res.status).toBe(200)
     expect(warnSpy).toHaveBeenCalledWith(
