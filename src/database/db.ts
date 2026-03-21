@@ -69,6 +69,21 @@ export class PodcastDatabase {
     ]) {
       try { this._db.exec(stmt) } catch { /* column already exists */ }
     }
+
+    this._migratePubDatesToIso()
+  }
+
+  private _migratePubDatesToIso(): void {
+    const rows = this._db.prepare('SELECT id, pub_date FROM articles').all() as { id: string; pub_date: string }[]
+    const update = this._db.prepare('UPDATE articles SET pub_date = ? WHERE id = ?')
+    for (const row of rows) {
+      // Skip already-ISO dates (starts with a 4-digit year)
+      if (/^\d{4}-/.test(row.pub_date)) continue
+      const iso = new Date(row.pub_date).toISOString()
+      if (!isNaN(new Date(iso).getTime())) {
+        update.run(iso, row.id)
+      }
+    }
   }
 
   // Metadata
