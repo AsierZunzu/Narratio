@@ -1,6 +1,5 @@
 import Parser from 'rss-parser'
-import { db as defaultDb } from '../database/db'
-import { Database as BetterSqlite3Database } from 'better-sqlite3'
+import { db as defaultDb, PodcastDatabase } from '../database/db'
 import { textToAudio } from './tts'
 import { convert } from 'html-to-text'
 import { createLogger } from '../utils/logger'
@@ -25,6 +24,9 @@ const parser = new Parser<Record<string, never>, CustomItem>({
   }
 })
 
+const TTS_MAX_RETRIES = parseInt(process.env.TTS_MAX_RETRIES ?? '3', 10)
+const RSS_FETCH_TIMEOUT = parseInt(process.env['RSS_FETCH_TIMEOUT'] ?? '30000', 10)
+
 function extractArticleImage(item: Parser.Item & CustomItem): string | null {
   if (item.itunes?.image) return item.itunes.image
 
@@ -43,53 +45,26 @@ function extractArticleImage(item: Parser.Item & CustomItem): string | null {
   return match ? match[1] : null
 }
 
-const TTS_MAX_RETRIES = parseInt(process.env.TTS_MAX_RETRIES ?? '3', 10)
-const RSS_FETCH_TIMEOUT = parseInt(process.env['RSS_FETCH_TIMEOUT'] ?? '30000', 10)
-
-async function retryFailedArticles(db: BetterSqlite3Database): Promise<void> {
-  const eligible = db.prepare(`
-    SELECT id, title, content
-    FROM   articles
-    WHERE  audio_path IS NULL
-      AND  is_purged  = 0
-      AND  tts_retry_count > 0
-      AND  tts_retry_count < ?
-  `).all(TTS_MAX_RETRIES) as { id: string; title: string; content: string }[]
+async function retryFailedArticles(db: PodcastDatabase): Promise<void> {
+  const eligible = db.getRetryEligibleArticles(TTS_MAX_RETRIES)
 
   if (eligible.length === 0) return
 
-  const updateSuccess = db.prepare(`
-    UPDATE articles
-    SET audio_path      = ?,
-        processed_at    = ?,
-        tts_retry_count = 0,
-        tts_failed_at   = NULL,
-        tts_error       = NULL
-    WHERE id = ?
-  `)
-  const updateFailure = db.prepare(`
-    UPDATE articles
-    SET tts_retry_count = tts_retry_count + 1,
-        tts_failed_at   = ?,
-        tts_error       = ?
-    WHERE id = ?
-  `)
-
   for (const article of eligible) {
-    const retryNum = (db.prepare('SELECT tts_retry_count FROM articles WHERE id = ?').get(article.id) as { tts_retry_count: number }).tts_retry_count
+    const retryNum = db.getArticleRetryCount(article.id)
     logger.log(`  Retrying TTS (attempt ${retryNum + 1}/${TTS_MAX_RETRIES}): ${article.title}`)
     try {
       const audioPath = await textToAudio(article.id.replace(/[^a-z0-9]/gi, '_'), article.content)
-      updateSuccess.run(audioPath, new Date().toISOString(), article.id)
+      db.markArticleAudioSuccess(article.id, audioPath)
       logger.log(`  Audio saved: ${audioPath}`)
     } catch (ttsErr) {
       logger.error(`  TTS retry failed for: ${article.title}`, ttsErr)
-      updateFailure.run(new Date().toISOString(), ttsErr instanceof Error ? ttsErr.message : String(ttsErr), article.id)
+      db.markArticleAudioFailure(article.id, ttsErr instanceof Error ? ttsErr.message : String(ttsErr))
     }
   }
 }
 
-export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defaultDb, customParser?: Parser<Record<string, never>, CustomItem>) {
+export async function parseRSSFeed(url: string, db: PodcastDatabase = defaultDb, customParser?: Parser<Record<string, never>, CustomItem>) {
   const p = customParser || parser
   let fetchTimeoutId: ReturnType<typeof setTimeout> | undefined
   try {
@@ -108,26 +83,8 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
 
     const feedImageUrl = (feed as { image?: { url?: string } }).image?.url || null
     if (feedImageUrl) {
-      db.prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)').run('feed_image_url', feedImageUrl)
+      db.setFeedImageUrl(feedImageUrl)
     }
-
-    const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content, image_url) VALUES (?, ?, ?, ?, ?, ?)')
-    const updateSuccess = db.prepare(`
-      UPDATE articles
-      SET audio_path      = ?,
-          processed_at    = ?,
-          tts_retry_count = 0,
-          tts_failed_at   = NULL,
-          tts_error       = NULL
-      WHERE id = ?
-    `)
-    const updateFailure = db.prepare(`
-      UPDATE articles
-      SET tts_retry_count = tts_retry_count + 1,
-          tts_failed_at   = ?,
-          tts_error       = ?
-      WHERE id = ?
-    `)
 
     for (const item of feed.items) {
       const id = item.guid || item.link || item.title || ''
@@ -138,7 +95,7 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
       const humanContent = convert(content, {
         selectors: [
           { selector: 'img', format: 'skip' },
-          { selector: 'figure', format: 'skip' },  // skips the whole figure/image block
+          { selector: 'figure', format: 'skip' },
           { selector: 'a', options: { ignoreHref: true } },
         ]
       })
@@ -151,18 +108,17 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
       }
 
       try {
-        insert.run(id, title, link, pubDate, humanContent, imageUrl)
+        db.insertArticle(id, title, link, pubDate, humanContent, imageUrl)
         logger.log(`New article: ${title}`)
 
-        // Trigger TTS for the new article
         try {
           logger.log(`  Generating audio for: ${title}`)
           const audioPath = await textToAudio(id.replace(/[^a-z0-9]/gi, '_'), text)
-          updateSuccess.run(audioPath, new Date().toISOString(), id)
+          db.markArticleAudioSuccess(id, audioPath)
           logger.log(`  Audio saved: ${audioPath}`)
         } catch (ttsErr) {
           logger.error(`  TTS failed for: ${title}`, ttsErr)
-          updateFailure.run(new Date().toISOString(), ttsErr instanceof Error ? ttsErr.message : String(ttsErr), id)
+          db.markArticleAudioFailure(id, ttsErr instanceof Error ? ttsErr.message : String(ttsErr))
         }
       } catch (err) {
         if (err instanceof Error && (err as { code?: string }).code === 'SQLITE_CONSTRAINT_PRIMARYKEY') {

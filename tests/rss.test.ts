@@ -16,35 +16,18 @@ jest.mock('../src/utils/storage', () => ({
 describe('RSS Parsing', () => {
   let mockDb: any
   let mockParser: any
-  let insertMock: any
-  let updateSuccessMock: any
-  let updateFailureMock: any
-  let retrySelectMock: any
-  let retryCountMock: any
-
-  let metadataInsertMock: any
 
   beforeEach(() => {
     jest.clearAllMocks()
     textToAudioMock.mockResolvedValue('/app/data/audio/test.wav')
 
-    insertMock = { run: jest.fn() }
-    metadataInsertMock = { run: jest.fn() }
-    updateSuccessMock = { run: jest.fn() }
-    updateFailureMock = { run: jest.fn() }
-    retrySelectMock = { all: jest.fn().mockReturnValue([]) }
-    retryCountMock = { get: jest.fn().mockReturnValue({ tts_retry_count: 1 }) }
-
     mockDb = {
-      prepare: jest.fn().mockImplementation((query: string) => {
-        if (query.includes('INSERT OR REPLACE INTO metadata')) return metadataInsertMock
-        if (query.includes('INSERT INTO articles')) return insertMock
-        if (query.includes('audio_path') && query.includes('tts_retry_count = 0')) return updateSuccessMock
-        if (query.includes('tts_retry_count = tts_retry_count + 1')) return updateFailureMock
-        if (query.includes('tts_retry_count > 0')) return retrySelectMock
-        if (query.includes('SELECT tts_retry_count')) return retryCountMock
-        return { run: jest.fn(), all: jest.fn().mockReturnValue([]), get: jest.fn() }
-      })
+      setFeedImageUrl: jest.fn(),
+      insertArticle: jest.fn(),
+      markArticleAudioSuccess: jest.fn(),
+      markArticleAudioFailure: jest.fn(),
+      getRetryEligibleArticles: jest.fn().mockReturnValue([]),
+      getArticleRetryCount: jest.fn().mockReturnValue(1),
     }
     mockParser = {
       parseURL: jest.fn()
@@ -77,12 +60,10 @@ describe('RSS Parsing', () => {
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(mockParser.parseURL).toHaveBeenCalledWith('http://test-feed.com')
-    expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT'))
-    expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE'))
-    expect(insertMock.run).toHaveBeenCalledTimes(2)
-    expect(updateSuccessMock.run).toHaveBeenCalledTimes(2)
-    expect(insertMock.run).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1', null)
-    expect(updateSuccessMock.run).toHaveBeenCalledWith('/app/data/audio/test.wav', expect.any(String), '1')
+    expect(mockDb.insertArticle).toHaveBeenCalledTimes(2)
+    expect(mockDb.markArticleAudioSuccess).toHaveBeenCalledTimes(2)
+    expect(mockDb.insertArticle).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1', null)
+    expect(mockDb.markArticleAudioSuccess).toHaveBeenCalledWith('1', '/app/data/audio/test.wav')
   })
 
   test('should handle existing articles without crashing', async () => {
@@ -92,7 +73,7 @@ describe('RSS Parsing', () => {
     }
     mockParser.parseURL.mockResolvedValue(mockFeed)
 
-    insertMock.run.mockImplementation(() => {
+    mockDb.insertArticle.mockImplementation(() => {
       const err: any = new Error('Constraint failed')
       err.code = 'SQLITE_CONSTRAINT_PRIMARYKEY'
       throw err
@@ -100,8 +81,8 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(insertMock.run).toHaveBeenCalled()
-    expect(updateSuccessMock.run).not.toHaveBeenCalled()
+    expect(mockDb.insertArticle).toHaveBeenCalled()
+    expect(mockDb.markArticleAudioSuccess).not.toHaveBeenCalled()
   })
 
   test('should log error when feed parsing fails', async () => {
@@ -114,7 +95,7 @@ describe('RSS Parsing', () => {
     consoleSpy.mockRestore()
   })
 
-  test('TTS failure updates DB columns', async () => {
+  test('TTS failure calls markArticleAudioFailure', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
     textToAudioMock.mockRejectedValue(new Error('Piper connection refused'))
 
@@ -126,12 +107,8 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(updateFailureMock.run).toHaveBeenCalledWith(
-      expect.any(String),
-      'Piper connection refused',
-      'art1'
-    )
-    expect(updateSuccessMock.run).not.toHaveBeenCalled()
+    expect(mockDb.markArticleAudioFailure).toHaveBeenCalledWith('art1', 'Piper connection refused')
+    expect(mockDb.markArticleAudioSuccess).not.toHaveBeenCalled()
     consoleSpy.mockRestore()
   })
 
@@ -139,7 +116,7 @@ describe('RSS Parsing', () => {
     const mockFeed = { title: 'Test Feed', items: [] }
     mockParser.parseURL.mockResolvedValue(mockFeed)
 
-    retrySelectMock.all.mockReturnValue([
+    mockDb.getRetryEligibleArticles.mockReturnValue([
       { id: 'failed1', title: 'Failed Article', content: 'Some content' }
     ])
 
@@ -155,32 +132,26 @@ describe('RSS Parsing', () => {
     const mockFeed = { title: 'Test Feed', items: [] }
     mockParser.parseURL.mockResolvedValue(mockFeed)
 
-    // retrySelectMock.all returns [] by default (articles above max retries are excluded by the SQL query)
-    retrySelectMock.all.mockReturnValue([])
+    mockDb.getRetryEligibleArticles.mockReturnValue([])
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(textToAudioMock).not.toHaveBeenCalled()
   })
 
-  test('successful retry clears failure state', async () => {
+  test('successful retry calls markArticleAudioSuccess', async () => {
     const mockFeed = { title: 'Test Feed', items: [] }
     mockParser.parseURL.mockResolvedValue(mockFeed)
 
-    retrySelectMock.all.mockReturnValue([
+    mockDb.getRetryEligibleArticles.mockReturnValue([
       { id: 'failed1', title: 'Failed Article', content: 'Some content' }
     ])
     textToAudioMock.mockResolvedValue('/app/data/audio/failed1.wav')
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(updateSuccessMock.run).toHaveBeenCalledWith(
-      '/app/data/audio/failed1.wav',
-      expect.any(String),
-      'failed1'
-    )
-    // updateSuccess sets tts_retry_count=0, tts_failed_at=NULL, tts_error=NULL via the SQL
-    expect(updateFailureMock.run).not.toHaveBeenCalled()
+    expect(mockDb.markArticleAudioSuccess).toHaveBeenCalledWith('failed1', '/app/data/audio/failed1.wav')
+    expect(mockDb.markArticleAudioFailure).not.toHaveBeenCalled()
   })
 
   test('should skip articles with no identifiable ID', async () => {
@@ -196,8 +167,8 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(insertMock.run).toHaveBeenCalledTimes(1)
-    expect(insertMock.run).toHaveBeenCalledWith('valid', expect.any(String), expect.any(String), expect.any(String), expect.any(String), null)
+    expect(mockDb.insertArticle).toHaveBeenCalledTimes(1)
+    expect(mockDb.insertArticle).toHaveBeenCalledWith('valid', expect.any(String), expect.any(String), expect.any(String), expect.any(String), null)
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping article with no identifiable ID'))
     consoleSpy.mockRestore()
   })
@@ -219,7 +190,16 @@ describe('RSS Parsing', () => {
     jest.useRealTimers()
   })
 
-  test('stores feed image URL in metadata when present', async () => {
+  test('should call cleanupStorage after processing feed', async () => {
+    const mockFeed = { title: 'Test Feed', items: [] }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(cleanupStorageMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('stores feed image URL when present', async () => {
     const mockFeed = {
       title: 'Test Feed',
       image: { url: 'http://example.com/feed.jpg', link: '', title: '' },
@@ -229,7 +209,7 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(metadataInsertMock.run).toHaveBeenCalledWith('feed_image_url', 'http://example.com/feed.jpg')
+    expect(mockDb.setFeedImageUrl).toHaveBeenCalledWith('http://example.com/feed.jpg')
   })
 
   test('does not store feed image when absent', async () => {
@@ -238,7 +218,7 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(metadataInsertMock.run).not.toHaveBeenCalled()
+    expect(mockDb.setFeedImageUrl).not.toHaveBeenCalled()
   })
 
   test('stores article image from itunes:image', async () => {
@@ -254,7 +234,7 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(insertMock.run).toHaveBeenCalledWith(
+    expect(mockDb.insertArticle).toHaveBeenCalledWith(
       '1', 'Article', 'http://example.com/1', '2023-01-01', 'Content', 'http://example.com/article.jpg'
     )
   })
@@ -272,7 +252,7 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(insertMock.run).toHaveBeenCalledWith(
+    expect(mockDb.insertArticle).toHaveBeenCalledWith(
       '2', 'Article', 'http://example.com/2', '2023-01-01', expect.any(String), 'http://example.com/img.jpg'
     )
   })
@@ -286,15 +266,6 @@ describe('RSS Parsing', () => {
 
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
-    expect(insertMock.run).toHaveBeenCalledWith('3', 'Article', 'http://example.com/3', '2023-01-01', 'No images here', null)
-  })
-
-  test('should call cleanupStorage after processing feed', async () => {
-    const mockFeed = { title: 'Test Feed', items: [] }
-    mockParser.parseURL.mockResolvedValue(mockFeed)
-
-    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
-
-    expect(cleanupStorageMock).toHaveBeenCalledTimes(1)
+    expect(mockDb.insertArticle).toHaveBeenCalledWith('3', 'Article', 'http://example.com/3', '2023-01-01', 'No images here', null)
   })
 })

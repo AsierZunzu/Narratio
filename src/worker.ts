@@ -1,7 +1,7 @@
 import * as cron from 'node-cron'
 import { parseRSSFeed } from './services/rss'
 import { isValidURL, checkReachability } from './utils/url'
-import { db, resetDatabase } from './database/db'
+import { db } from './database/db'
 import { deleteAllAudioFiles } from './utils/storage'
 import { createLogger } from './utils/logger'
 
@@ -49,13 +49,12 @@ export async function main() {
   }
 
   // Check against stored feed URL
-  const storedUrlRow = db.prepare('SELECT value FROM metadata WHERE key = \'feed_url\'').get() as { value: string } | undefined
-  const storedUrl = storedUrlRow?.value
+  const storedUrl = db.getFeedUrl()
   if (forceReset) {
     logger.log('Force reset requested. Reinitializing database for new feed...')
     deleteAllAudioFiles()
-    resetDatabase(db)
-    db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
+    db.reset()
+    db.setFeedUrl(feedUrl)
   }
   if (storedUrl && storedUrl !== feedUrl) {
     logger.error('The provided feed URL does not match the one stored in the database.')
@@ -67,7 +66,7 @@ export async function main() {
     return // for TS
   }
   if (!storedUrl) {
-    db.prepare('INSERT INTO metadata (key, value) VALUES (\'feed_url\', ?)').run(feedUrl)
+    db.setFeedUrl(feedUrl)
   }
 
   const pollInterval = process.env['POLL_INTERVAL']

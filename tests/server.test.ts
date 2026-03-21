@@ -1,7 +1,12 @@
 import request from 'supertest'
 
 jest.mock('../src/database/db', () => ({
-  db: { prepare: jest.fn() }
+  db: {
+    getFeedUrl: jest.fn(),
+    getFeedImageUrl: jest.fn(),
+    getPublishedArticles: jest.fn().mockReturnValue([]),
+  },
+  PublishedArticle: undefined,
 }))
 
 jest.mock('../src/services/tts', () => ({
@@ -19,19 +24,15 @@ import { db } from '../src/database/db'
 import { textToAudio } from '../src/services/tts'
 import * as fs from 'fs'
 
-const mockPrepare = db.prepare as jest.Mock
+const mockGetFeedUrl = db.getFeedUrl as jest.Mock
+const mockGetFeedImageUrl = db.getFeedImageUrl as jest.Mock
+const mockGetPublishedArticles = db.getPublishedArticles as jest.Mock
 const mockTextToAudio = textToAudio as jest.Mock
 
 function setupDb(articles: object[], feedUrl?: string, feedImageUrl?: string) {
-  mockPrepare.mockImplementation((query: string) => {
-    if (query.includes('feed_image_url')) {
-      return { get: jest.fn().mockReturnValue(feedImageUrl ? { value: feedImageUrl } : undefined) }
-    }
-    if (query.includes('metadata')) {
-      return { get: jest.fn().mockReturnValue(feedUrl ? { value: feedUrl } : undefined) }
-    }
-    return { all: jest.fn().mockReturnValue(articles) }
-  })
+  mockGetFeedUrl.mockReturnValue(feedUrl)
+  mockGetFeedImageUrl.mockReturnValue(feedImageUrl)
+  mockGetPublishedArticles.mockReturnValue(articles)
 }
 
 describe('GET /rss', () => {
