@@ -22,11 +22,14 @@ describe('RSS Parsing', () => {
   let retrySelectMock: any
   let retryCountMock: any
 
+  let metadataInsertMock: any
+
   beforeEach(() => {
     jest.clearAllMocks()
     textToAudioMock.mockResolvedValue('/app/data/audio/test.wav')
 
     insertMock = { run: jest.fn() }
+    metadataInsertMock = { run: jest.fn() }
     updateSuccessMock = { run: jest.fn() }
     updateFailureMock = { run: jest.fn() }
     retrySelectMock = { all: jest.fn().mockReturnValue([]) }
@@ -34,7 +37,8 @@ describe('RSS Parsing', () => {
 
     mockDb = {
       prepare: jest.fn().mockImplementation((query: string) => {
-        if (query.includes('INSERT')) return insertMock
+        if (query.includes('INSERT OR REPLACE INTO metadata')) return metadataInsertMock
+        if (query.includes('INSERT INTO articles')) return insertMock
         if (query.includes('audio_path') && query.includes('tts_retry_count = 0')) return updateSuccessMock
         if (query.includes('tts_retry_count = tts_retry_count + 1')) return updateFailureMock
         if (query.includes('tts_retry_count > 0')) return retrySelectMock
@@ -77,7 +81,7 @@ describe('RSS Parsing', () => {
     expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE'))
     expect(insertMock.run).toHaveBeenCalledTimes(2)
     expect(updateSuccessMock.run).toHaveBeenCalledTimes(2)
-    expect(insertMock.run).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1')
+    expect(insertMock.run).toHaveBeenCalledWith('1', 'Article 1', 'http://example.com/1', '2023-01-01', 'Content 1', null)
     expect(updateSuccessMock.run).toHaveBeenCalledWith('/app/data/audio/test.wav', expect.any(String), '1')
   })
 
@@ -193,7 +197,7 @@ describe('RSS Parsing', () => {
     await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
 
     expect(insertMock.run).toHaveBeenCalledTimes(1)
-    expect(insertMock.run).toHaveBeenCalledWith('valid', expect.any(String), expect.any(String), expect.any(String), expect.any(String))
+    expect(insertMock.run).toHaveBeenCalledWith('valid', expect.any(String), expect.any(String), expect.any(String), expect.any(String), null)
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping article with no identifiable ID'))
     consoleSpy.mockRestore()
   })
@@ -213,6 +217,76 @@ describe('RSS Parsing', () => {
     )
     consoleSpy.mockRestore()
     jest.useRealTimers()
+  })
+
+  test('stores feed image URL in metadata when present', async () => {
+    const mockFeed = {
+      title: 'Test Feed',
+      image: { url: 'http://example.com/feed.jpg', link: '', title: '' },
+      items: []
+    }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(metadataInsertMock.run).toHaveBeenCalledWith('feed_image_url', 'http://example.com/feed.jpg')
+  })
+
+  test('does not store feed image when absent', async () => {
+    const mockFeed = { title: 'Test Feed', items: [] }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(metadataInsertMock.run).not.toHaveBeenCalled()
+  })
+
+  test('stores article image from itunes:image', async () => {
+    const mockFeed = {
+      title: 'Test Feed',
+      items: [{
+        guid: '1', title: 'Article', link: 'http://example.com/1',
+        pubDate: '2023-01-01', contentSnippet: 'Content',
+        itunes: { image: 'http://example.com/article.jpg' }
+      }]
+    }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(insertMock.run).toHaveBeenCalledWith(
+      '1', 'Article', 'http://example.com/1', '2023-01-01', 'Content', 'http://example.com/article.jpg'
+    )
+  })
+
+  test('stores article image extracted from HTML content', async () => {
+    const mockFeed = {
+      title: 'Test Feed',
+      items: [{
+        guid: '2', title: 'Article', link: 'http://example.com/2',
+        pubDate: '2023-01-01',
+        contentEncoded: '<p>Text</p><img src="http://example.com/img.jpg" />'
+      }]
+    }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(insertMock.run).toHaveBeenCalledWith(
+      '2', 'Article', 'http://example.com/2', '2023-01-01', expect.any(String), 'http://example.com/img.jpg'
+    )
+  })
+
+  test('stores null image_url when no image is found', async () => {
+    const mockFeed = {
+      title: 'Test Feed',
+      items: [{ guid: '3', title: 'Article', link: 'http://example.com/3', pubDate: '2023-01-01', contentSnippet: 'No images here' }]
+    }
+    mockParser.parseURL.mockResolvedValue(mockFeed)
+
+    await parseRSSFeed('http://test-feed.com', mockDb, mockParser as any)
+
+    expect(insertMock.run).toHaveBeenCalledWith('3', 'Article', 'http://example.com/3', '2023-01-01', 'No images here', null)
   })
 
   test('should call cleanupStorage after processing feed', async () => {

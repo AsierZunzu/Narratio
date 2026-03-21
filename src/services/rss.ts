@@ -10,13 +10,38 @@ const logger = createLogger('RSS')
 
 type CustomItem = {
   contentEncoded?: string
+  itunes?: { image?: string }
+  mediaContent?: { $?: { url?: string } } | { $?: { url?: string } }[]
+  mediaThumbnail?: { $?: { url?: string } } | { $?: { url?: string } }[]
 }
 
 const parser = new Parser<Record<string, never>, CustomItem>({
   customFields: {
-    item: [['content:encoded', 'contentEncoded']],
+    item: [
+      ['content:encoded', 'contentEncoded'],
+      ['media:content', 'mediaContent'],
+      ['media:thumbnail', 'mediaThumbnail'],
+    ],
   }
 })
+
+function extractArticleImage(item: Parser.Item & CustomItem): string | null {
+  if (item.itunes?.image) return item.itunes.image
+
+  const mediaContent = Array.isArray(item.mediaContent) ? item.mediaContent[0] : item.mediaContent
+  if (mediaContent?.['$']?.url) return mediaContent['$'].url
+
+  const mediaThumbnail = Array.isArray(item.mediaThumbnail) ? item.mediaThumbnail[0] : item.mediaThumbnail
+  if (mediaThumbnail?.['$']?.url) return mediaThumbnail['$'].url
+
+  if (item.enclosure?.url && /\.(jpe?g|png|gif|webp)(\?|$)/i.test(item.enclosure.url)) {
+    return item.enclosure.url
+  }
+
+  const rawHtml = (item as { contentEncoded?: string }).contentEncoded || item.content || ''
+  const match = rawHtml.match(/<img[^>]+src=["']([^"']+)["']/i)
+  return match ? match[1] : null
+}
 
 const TTS_MAX_RETRIES = parseInt(process.env.TTS_MAX_RETRIES ?? '3', 10)
 const RSS_FETCH_TIMEOUT = parseInt(process.env['RSS_FETCH_TIMEOUT'] ?? '30000', 10)
@@ -81,7 +106,12 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
     clearTimeout(fetchTimeoutId)
     logger.log(`Processing feed: ${feed.title}`)
 
-    const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content) VALUES (?, ?, ?, ?, ?)')
+    const feedImageUrl = (feed as { image?: { url?: string } }).image?.url || null
+    if (feedImageUrl) {
+      db.prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)').run('feed_image_url', feedImageUrl)
+    }
+
+    const insert = db.prepare('INSERT INTO articles (id, title, link, pub_date, content, image_url) VALUES (?, ?, ?, ?, ?, ?)')
     const updateSuccess = db.prepare(`
       UPDATE articles
       SET audio_path      = ?,
@@ -113,6 +143,7 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
         ]
       })
       const text = `${title} \n\n\n ${humanContent}`
+      const imageUrl = extractArticleImage(item)
 
       if (!id) {
         logger.log(`Skipping article with no identifiable ID (title: "${title}")`)
@@ -120,7 +151,7 @@ export async function parseRSSFeed(url: string, db: BetterSqlite3Database = defa
       }
 
       try {
-        insert.run(id, title, link, pubDate, humanContent)
+        insert.run(id, title, link, pubDate, humanContent, imageUrl)
         logger.log(`New article: ${title}`)
 
         // Trigger TTS for the new article

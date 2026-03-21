@@ -36,11 +36,12 @@ export function initDatabase(path: string = DB_PATH) {
     );
   `)
 
-  // Migrate existing databases: add TTS retry tracking columns
+  // Migrate existing databases: add columns if not present
   for (const stmt of [
     'ALTER TABLE articles ADD COLUMN tts_retry_count INTEGER DEFAULT 0',
     'ALTER TABLE articles ADD COLUMN tts_failed_at TEXT',
     'ALTER TABLE articles ADD COLUMN tts_error TEXT',
+    'ALTER TABLE articles ADD COLUMN image_url TEXT',
   ]) {
     try { db.exec(stmt) } catch { /* column already exists */ }
   }
