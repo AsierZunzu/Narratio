@@ -135,11 +135,11 @@ describe('GET /rss', () => {
   test('logs warning and uses fileSize 0 when statSync throws for normal article', async () => {
     (fs.statSync as jest.Mock).mockImplementation(() => { throw new Error('stat failed') })
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation()
-    setupDb([{ id: '1', title: 'Article', link: 'L', pub_date: 'D', content: 'C', audio_path: '/data/audio/article.wav', is_purged: 0, image_url: null }])
+    setupDb([{ id: '1', title: 'Article', link: 'L', pub_date: 'D', content: 'C', audio_path: '/app/data/audio/article.wav', is_purged: 0, image_url: null }])
     const res = await request(app).get('/rss')
     expect(res.status).toBe(200)
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Could not get file size for /data/audio/article.wav'),
+      expect.stringContaining('Could not get file size for /app/data/audio/article.wav'),
       expect.any(Error)
     )
     warnSpy.mockRestore()
