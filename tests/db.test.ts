@@ -55,10 +55,10 @@ describe('PodcastDatabase', () => {
 
     test('markArticleAudioSuccess makes article appear in getPublishedArticles', () => {
       db.insertArticle('a1', 'Title', 'http://example.com', '2024-01-01', 'Content', null)
-      db.markArticleAudioSuccess('a1', '/data/audio/a1.wav')
+      db.markArticleAudioSuccess('a1', '/app/data/audio/a1.wav')
       const articles = db.getPublishedArticles()
       expect(articles).toHaveLength(1)
-      expect(articles[0].audio_path).toBe('/data/audio/a1.wav')
+      expect(articles[0].audio_path).toBe('/app/data/audio/a1.wav')
     })
 
     test('markArticleAudioFailure increments retry count', () => {
@@ -70,7 +70,7 @@ describe('PodcastDatabase', () => {
     test('markArticleAudioSuccess resets retry count to 0', () => {
       db.insertArticle('a1', 'Title', 'http://example.com', '2024-01-01', 'Content', null)
       db.markArticleAudioFailure('a1', 'err')
-      db.markArticleAudioSuccess('a1', '/data/audio/a1.wav')
+      db.markArticleAudioSuccess('a1', '/app/data/audio/a1.wav')
       expect(db.getArticleRetryCount('a1')).toBe(0)
     })
 
@@ -84,9 +84,9 @@ describe('PodcastDatabase', () => {
     })
 
     test('getActiveAudioArticles returns only non-purged articles with audio', () => {
-      db.insertArticle('a1', 'T1', 'L1', '2024-01-01', 'C', null, '/data/audio/a1.wav')
+      db.insertArticle('a1', 'T1', 'L1', '2024-01-01', 'C', null, '/app/data/audio/a1.wav')
       db.insertArticle('a2', 'T2', 'L2', '2024-01-02', 'C', null)
-      db.insertArticle('a3', 'T3', 'L3', '2024-01-03', 'C', null, '/data/audio/a3.wav')
+      db.insertArticle('a3', 'T3', 'L3', '2024-01-03', 'C', null, '/app/data/audio/a3.wav')
       db.markArticlePurged('a3')
       const rows = db.getActiveAudioArticles()
       expect(rows).toHaveLength(1)
@@ -117,7 +117,7 @@ describe('PodcastDatabase', () => {
 
     test('image_url is stored and returned', () => {
       db.insertArticle('a1', 'Title', 'L', '2024-01-01', 'C', 'http://example.com/img.jpg')
-      db.markArticleAudioSuccess('a1', '/data/audio/a1.wav')
+      db.markArticleAudioSuccess('a1', '/app/data/audio/a1.wav')
       const articles = db.getPublishedArticles()
       expect(articles[0].image_url).toBe('http://example.com/img.jpg')
     })
