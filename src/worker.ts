@@ -20,7 +20,8 @@ async function runWorkerTask(feedUrl: string) {
 export async function main() {
   const args = process.argv.slice(2)
   const forceReset = args.includes('--force-reset')
-  const urls = args.filter(arg => arg !== '--force-reset')
+  const retryFailed = args.includes('--retry-failed')
+  const urls = args.filter(arg => arg !== '--force-reset' && arg !== '--retry-failed')
 
   let feedUrl = urls[0]
 
@@ -67,6 +68,11 @@ export async function main() {
   }
   if (!storedUrl) {
     db.setFeedUrl(feedUrl)
+  }
+
+  if (retryFailed) {
+    const count = db.resetAllTtsRetryCount()
+    logger.log(`Reset TTS retry count for ${count} article(s). Retrying failed articles...`)
   }
 
   const pollInterval = process.env['POLL_INTERVAL']

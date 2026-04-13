@@ -24,6 +24,7 @@ jest.mock('../src/database/db', () => ({
     setFeedUrl: jest.fn(),
     reset: jest.fn(),
     close: jest.fn(),
+    resetAllTtsRetryCount: jest.fn().mockReturnValue(2),
   },
 }))
 
@@ -99,6 +100,27 @@ describe('Worker Cron Scheduling', () => {
 
     expect(process.listenerCount('SIGTERM')).toBe(sigtermBefore + 1)
     expect(process.listenerCount('SIGINT')).toBe(sigintBefore + 1)
+  })
+
+  it('should reset retry counts and run task when --retry-failed is passed', async () => {
+    delete process.env.POLL_INTERVAL
+    process.env.RSS_URL = 'http://example.com/rss'
+    process.argv = ['node', 'worker.js', '--retry-failed']
+
+    await main()
+
+    expect((db as any).resetAllTtsRetryCount).toHaveBeenCalledTimes(1)
+    expect(parseRSSFeed).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not reset retry counts when --retry-failed is not passed', async () => {
+    delete process.env.POLL_INTERVAL
+    process.env.RSS_URL = 'http://example.com/rss'
+    process.argv = ['node', 'worker.js']
+
+    await main()
+
+    expect((db as any).resetAllTtsRetryCount).not.toHaveBeenCalled()
   })
 
   it('should stop cron task and close db on SIGTERM', async () => {

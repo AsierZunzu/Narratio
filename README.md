@@ -48,6 +48,20 @@ docker compose run --rm worker npm run start:worker -- <NEW_RSS_URL> --force-res
 ```
 Alternatively, you can manually delete the contents of the `data/` directory and restart the stack.
 
+### Retrying Failed TTS Generation
+
+If articles have exhausted their TTS retry limit (see `TTS_MAX_RETRIES`), you can reset all retry counters and trigger a new attempt with `--retry-failed`:
+
+```bash
+npm run start:worker -- <RSS_URL> --retry-failed
+```
+
+This resets the retry count and failure state for every article and then immediately runs the worker, so all articles without audio will be reattempted. In Docker:
+
+```bash
+docker compose run --rm worker npm run start:worker -- --retry-failed
+```
+
 ### Worker Configuration
 - `RSS_URL`: The RSS feed URL to parse (required).
 - `POLL_INTERVAL`: Cron expression for periodic polling (e.g., `0 * * * *` for hourly). If not set, the worker runs once and exits.
