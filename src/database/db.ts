@@ -162,9 +162,18 @@ export class PodcastDatabase {
       FROM   articles
       WHERE  audio_path IS NULL
         AND  is_purged  = 0
-        AND  tts_retry_count > 0
         AND  tts_retry_count < ?
     `).all(maxRetries) as RetryArticle[]
+  }
+
+  resetAllTtsRetryCount(): number {
+    const result = this._db.prepare(`
+      UPDATE articles
+      SET tts_retry_count = 0,
+          tts_failed_at   = NULL,
+          tts_error       = NULL
+    `).run()
+    return result.changes
   }
 
   getArticleRetryCount(id: string): number {

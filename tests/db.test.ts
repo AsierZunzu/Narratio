@@ -102,6 +102,38 @@ describe('PodcastDatabase', () => {
       expect(db.getRetryEligibleArticles(3)).toHaveLength(0)
     })
 
+    test('resetAllTtsRetryCount resets count to 0 for all articles and re-enables retry', () => {
+      db.insertArticle('a1', 'T1', 'L1', '2024-01-01', 'C', null)
+      db.insertArticle('a2', 'T2', 'L2', '2024-01-02', 'C', null)
+      db.markArticleAudioFailure('a1', 'err')
+      db.markArticleAudioFailure('a1', 'err')
+      db.markArticleAudioFailure('a1', 'err') // retry_count = 3 (exhausted)
+      db.markArticleAudioFailure('a2', 'err') // retry_count = 1
+      // Neither should be eligible at maxRetries=3 for a1; a2 still is but let's exhaust it too
+      db.markArticleAudioFailure('a2', 'err')
+      db.markArticleAudioFailure('a2', 'err') // retry_count = 3 (exhausted)
+      expect(db.getRetryEligibleArticles(3)).toHaveLength(0)
+
+      const changed = db.resetAllTtsRetryCount()
+      expect(changed).toBe(2)
+      expect(db.getArticleRetryCount('a1')).toBe(0)
+      expect(db.getArticleRetryCount('a2')).toBe(0)
+      // Both should now be eligible again
+      expect(db.getRetryEligibleArticles(3)).toHaveLength(2)
+    })
+
+    test('resetAllTtsRetryCount does not make articles with audio eligible for retry', () => {
+      db.insertArticle('a1', 'T1', 'L1', '2024-01-01', 'C', null, '/audio/a1.wav')
+      db.insertArticle('a2', 'T2', 'L2', '2024-01-02', 'C', null)
+      db.markArticleAudioFailure('a2', 'err')
+      db.markArticleAudioFailure('a2', 'err')
+      db.markArticleAudioFailure('a2', 'err') // exhausted
+      db.resetAllTtsRetryCount()
+      // a1 has audio so should not appear; a2 was reset and has no audio
+      expect(db.getRetryEligibleArticles(3)).toHaveLength(1)
+      expect(db.getRetryEligibleArticles(3)[0].id).toBe('a2')
+    })
+
     test('getArticle returns article data', () => {
       db.insertArticle('a1', 'Title', 'http://example.com', '2024-01-01', 'Content', null)
       const row = db.getArticle('a1')
