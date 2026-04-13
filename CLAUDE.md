@@ -20,7 +20,7 @@ Narratio converts RSS feeds into podcast feeds with generated audio. It has two 
 - **Server** (`src/server.ts`) — Express app that serves generated WAV files as static assets and exposes a `/rss` endpoint that builds podcast-compatible XML from the database.
 - **TTS** (`src/tts.ts`) — Communicates with an external [Piper](https://github.com/rhasspy/piper) TTS process using the Wyoming protocol over TCP. Collects PCM audio chunks and writes a RIFF WAV file to disk.
 - **RSS parser** (`src/rss.ts`) — Fetches and parses feeds, then calls `textToAudio()` per article.
-- **Database** (`src/database/db.ts`) — SQLite via `better-sqlite3`. Schema: `metadata` (key/value, stores `feed_url`) and `articles` (id, title, link, pub_date, content, audio_path, is_purged).
+- **Database** (`src/database/db.ts`) — SQLite via `better-sqlite3`. Schema: `metadata` (key/value, stores `feed_url`) and `articles` (id, title, link, pub_date, content, audio_path, is_purged, tts_retry_count, tts_failed_at, tts_error).
 - **Storage utils** (`src/utils/storage.ts`) — Enforces `MAX_AUDIO_FILES` / `MAX_AUDIO_SIZE_MB` limits by deleting oldest audio files and marking articles as purged.
 
 ### Wyoming Protocol (TTS)
@@ -32,7 +32,7 @@ Narratio converts RSS feeds into podcast feeds with generated audio. It has two 
 - `audio-stop` — triggers WAV header construction and file write
 - `error` — surfaced as a thrown error
 
-The whole operation is wrapped in a `TTS_TIMEOUT` (env var, default 30s) promise race.
+The whole operation is wrapped in a `TTS_TIMEOUT` (env var in **seconds**, default 300 = 5 min) promise race.
 
 ## Key Environment Variables
 
@@ -41,7 +41,8 @@ The whole operation is wrapped in a `TTS_TIMEOUT` (env var, default 30s) promise
 | `RSS_URL` | worker | Feed URL to poll |
 | `POLL_INTERVAL` | worker | Cron expression (e.g. `0 * * * *`) |
 | `PIPER_HOST` / `PIPER_PORT` | worker | Wyoming TCP endpoint |
-| `TTS_TIMEOUT` | worker | TTS timeout in ms (default 30000) |
+| `TTS_TIMEOUT` | worker | TTS timeout in **seconds** (default 300 = 5 min). Code multiplies by 1000. |
+| `TTS_MAX_RETRIES` | worker | Max retry attempts per failed article (default 3). Set to `0` to disable. |
 | `RSS_FETCH_TIMEOUT` | worker | RSS feed fetch timeout in ms (default 30000) |
 | `MAX_AUDIO_FILES` | worker | Max WAV files to retain |
 | `MAX_AUDIO_SIZE_MB` | worker | Max total audio storage in MB |
@@ -51,7 +52,8 @@ The whole operation is wrapped in a `TTS_TIMEOUT` (env var, default 30s) promise
 ## Development Notes
 
 - TypeScript compiles to `dist/` (CommonJS, ES2016 target). Run `npm run build` before `npm start`.
-- Tests live in `tests/` and use `ts-jest`. The test pattern is `**/tests/**/*.test.ts`.
+- Tests live in `tests/` and use `ts-jest` with `tsconfig.test.json` (extends the main tsconfig, adds jest types and includes the `tests/` directory). The test pattern is `**/tests/**/*.test.ts`.
+- Worker CLI flags: `--force-reset` reinitializes the database for a new feed URL; `--retry-failed` resets TTS retry counters for all articles and immediately reruns ingestion.
 - The `data/` directory (audio files + SQLite DB) is gitignored. Docker Compose mounts `./data/app` to `/app/data` on both containers.
 - `compose.override.yaml` is gitignored — use it for local overrides without touching `compose.yaml`.
 
