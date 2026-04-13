@@ -194,7 +194,7 @@ describe('TTS Service', () => {
     const promise = textToAudio(mockId, mockText)
     jest.advanceTimersByTime(300 * 1000 + 1) // TIMEOUT_MS = parseInt('300') * 1000
 
-    await expect(promise).rejects.toThrow('TTS request timed out')
+    await expect(promise).rejects.toThrow('TTS request timed out after')
 
     jest.useRealTimers()
   })

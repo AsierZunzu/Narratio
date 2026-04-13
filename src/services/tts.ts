@@ -49,6 +49,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
   }
 
   const audioPath = customPath || join(AUDIO_DIR, `${id}.wav`)
+  const startTime = Date.now()
 
   return new Promise<string>((resolve, reject) => {
     const client = new Socket()
@@ -77,7 +78,8 @@ export async function textToAudio(id: string, text: string, customPath?: string)
     // Set a timeout to avoid hanging
     const timeout = setTimeout(() => {
       client.destroy()
-      settle(() => reject(new Error('TTS request timed out')))
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+      settle(() => reject(new Error(`TTS request timed out after ${elapsed}s`)))
     }, TIMEOUT_MS)
 
     client.connect(PIPER_PORT, PIPER_HOST, () => {
@@ -190,7 +192,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
               return
             }
             writeFileSync(audioPath, buildWav(audioData, sampleRate, sampleWidth, channels))
-            logger.log(`Audio stored: ${audioPath} (${audioData.length} PCM bytes)`)
+            logger.log(`Audio stored: ${audioPath} (${audioData.length} PCM bytes, ${((Date.now() - startTime) / 1000).toFixed(1)}s)`)
             settle(() => resolve(audioPath))
             return
           } else if (header.type === 'error') {
@@ -245,7 +247,7 @@ export async function textToAudio(id: string, text: string, customPath?: string)
       // but write the file rather than silently losing the audio).
       writeFileSync(audioPath, buildWav(audioData, sampleRate, sampleWidth, channels))
       client.destroy()
-      console.log(`[TTS] Audio stored: ${audioPath} (${audioData.length} PCM bytes)`)
+      logger.log(`Audio stored: ${audioPath} (${audioData.length} PCM bytes, ${((Date.now() - startTime) / 1000).toFixed(1)}s)`)
       settle(() => resolve(audioPath))
     })
 
