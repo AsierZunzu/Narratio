@@ -40,6 +40,7 @@ services:
     command: node dist/server/index.js
     environment:
       PORT: ${PORT:-3000}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
       PODCAST_TITLE: ${PODCAST_TITLE:-Narratio}
       PODCAST_DESCRIPTION: ${PODCAST_DESCRIPTION:-}
       PODCAST_AUTHOR: ${PODCAST_AUTHOR:-Narratio Worker}

@@ -23,6 +23,7 @@ interface CustomItem {
   'media:thumbnail'?: { $?: { url?: string } };
   enclosures?: Array<{ url?: string; type?: string }>;
   'itunes:image'?: { $?: { href?: string } };
+  'content:encoded'?: string;
   content?: string;
   contentSnippet?: string;
 }
@@ -96,7 +97,7 @@ export async function processFeed(db: Database, opts: RssServiceOptions): Promis
   for (const raw of feed.items) {
     const item = raw as FeedItem;
     const guid = deriveGuid(item);
-    const rawHtml = item.content ?? (item as Record<string, unknown>)['content:encoded'] as string ?? item.contentSnippet ?? '';
+    const rawHtml = item.content ?? item['content:encoded'] ?? item.contentSnippet ?? '';
     const content = htmlToText(rawHtml);
     const imageUrl = extractImageUrl(item);
 
