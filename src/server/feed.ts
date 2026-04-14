@@ -26,7 +26,7 @@ export function buildFeedXml(db: Database, config: FeedConfig): string {
     generator: 'Narratio',
     customNamespaces: {},
     customElements: [],
-    namespaces: { itunes: true },
+    namespaces: { iTunes: true },
     itunesAuthor: env.PODCAST_ITUNES_AUTHOR(),
     itunesSummary: env.PODCAST_ITUNES_SUMMARY() || description,
     itunesOwner: {
