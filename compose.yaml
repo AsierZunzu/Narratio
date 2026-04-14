@@ -2,7 +2,7 @@ services:
   tts:
     image: rhasspy/wyoming-piper
     restart: unless-stopped
-    command: --voice en_US-lessac-medium
+    command: --voice ${PIPER_VOICE:-en_US-lessac-medium}
     volumes:
       - ./data/piper:/data
     ports:
