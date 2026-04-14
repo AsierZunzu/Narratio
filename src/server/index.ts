@@ -148,13 +148,20 @@ export function createApp(dbPath = DB_PATH): express.Application {
 }
 
 async function main(): Promise<void> {
-  await ensureFallbackAudio();
-
   const app = createApp();
   const port = env.PORT();
 
+  const baseUrl = process.env['BASE_URL'] ?? `http://localhost:${port}`;
+
   const server = app.listen(port, () => {
-    logger.info(`Narratio server listening on port ${port}`);
+    logger.info('Narratio server is ready');
+    logger.info(`  Dashboard : ${baseUrl}/`);
+    logger.info(`  RSS feed  : ${baseUrl}/rss`);
+    logger.info(`  API       : ${baseUrl}/api/articles`);
+    // Generate fallback audio in the background — don't block startup
+    ensureFallbackAudio().catch((err) =>
+      logger.warn(`Fallback audio generation failed: ${err instanceof Error ? err.message : String(err)}`),
+    );
   });
 
   const shutdown = () => {
