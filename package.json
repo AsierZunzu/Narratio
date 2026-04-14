@@ -1,0 +1,30 @@
+{
+  "name": "narratio",
+  "version": "1.0.0",
+  "description": "Self-hosted RSS-to-podcast with AI-generated audio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "express": "^4.19.2",
+    "html-to-text": "^9.0.5",
+    "node-cron": "^3.0.3",
+    "podcast": "^2.0.1",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/express": "^4.17.21",
+    "@types/html-to-text": "^9.0.4",
+    "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
