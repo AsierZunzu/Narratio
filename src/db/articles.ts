@@ -95,3 +95,21 @@ export function countDoneArticles(db: Database): number {
 export function updateArticleStatus(db: Database, guid: string, status: ArticleStatus): void {
   db.prepare('UPDATE articles SET status = ? WHERE guid = ?').run(status, guid);
 }
+
+export function getAllArticles(db: Database): Article[] {
+  return db.prepare(`
+    SELECT * FROM articles ORDER BY pub_date DESC, created_at DESC
+  `).all() as Article[];
+}
+
+export function deleteArticle(db: Database, guid: string): boolean {
+  const result = db.prepare('DELETE FROM articles WHERE guid = ?').run(guid);
+  return result.changes > 0;
+}
+
+export function resetArticleRetries(db: Database, guid: string): boolean {
+  const result = db.prepare(`
+    UPDATE articles SET tts_retries = 0, status = 'pending', error = NULL WHERE guid = ? AND status = 'failed'
+  `).run(guid);
+  return result.changes > 0;
+}

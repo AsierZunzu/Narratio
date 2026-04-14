@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
+import { renderDashboard } from './ui.js';
+import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged } from '../db/articles.js';
 import { synthesise } from '../services/tts.js';
 import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
@@ -70,6 +72,76 @@ export function createApp(dbPath = DB_PATH): express.Application {
       logger.error('Failed to build RSS feed', err);
       res.status(500).send('Internal server error');
     }
+  });
+
+  // ── Dashboard UI ────────────────────────────────────────────────────────────
+
+  app.get('/', (_req, res) => {
+    try {
+      const articles = getAllArticles(db);
+      const html = renderDashboard(articles, baseUrl);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (err) {
+      logger.error('Failed to render dashboard', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  // ── REST API ────────────────────────────────────────────────────────────────
+
+  app.get('/api/articles', (_req, res) => {
+    res.json(getAllArticles(db));
+  });
+
+  app.delete('/api/articles/:guid', (req, res) => {
+    const { guid } = req.params;
+    const article = db.prepare('SELECT audio_file FROM articles WHERE guid = ?').get(guid) as
+      | { audio_file: string | null }
+      | undefined;
+
+    if (!article) {
+      res.status(404).send('Article not found');
+      return;
+    }
+
+    if (article.audio_file) {
+      const filePath = path.join(AUDIO_DIR, article.audio_file);
+      try { fs.unlinkSync(filePath); } catch { /* already gone */ }
+    }
+
+    deleteArticle(db, guid);
+    res.status(204).end();
+  });
+
+  app.post('/api/articles/:guid/retry', (req, res) => {
+    const { guid } = req.params;
+    const updated = resetArticleRetries(db, guid);
+    if (!updated) {
+      res.status(404).send('Article not found or not in failed state');
+      return;
+    }
+    res.status(204).end();
+  });
+
+  app.post('/api/articles/:guid/purge', (req, res) => {
+    const { guid } = req.params;
+    const article = db.prepare('SELECT audio_file, status FROM articles WHERE guid = ?').get(guid) as
+      | { audio_file: string | null; status: string }
+      | undefined;
+
+    if (!article || article.status !== 'done') {
+      res.status(404).send('Article not found or not in done state');
+      return;
+    }
+
+    if (article.audio_file) {
+      const filePath = path.join(AUDIO_DIR, article.audio_file);
+      try { fs.unlinkSync(filePath); } catch { /* already gone */ }
+    }
+
+    markArticlePurged(db, guid);
+    res.status(204).end();
   });
 
   return app;
