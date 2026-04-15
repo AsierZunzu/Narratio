@@ -21,8 +21,6 @@ function startMockServer(
   });
 }
 
-const FAKE_WAV = Buffer.from('RIFF....WAVEfmt ', 'ascii');
-
 describe('synthesise', () => {
   const servers: net.Server[] = [];
   afterEach(() => {
@@ -30,10 +28,20 @@ describe('synthesise', () => {
     servers.length = 0;
   });
 
-  it('writes raw WAV response to output file', async () => {
+  it('builds a valid WAV file from Wyoming audio events', async () => {
+    const pcm = Buffer.alloc(100, 0xab); // fake PCM samples
+    const audioStart = JSON.stringify({ type: 'audio-start', data: { rate: 16000, width: 2, channels: 1 }, payload_length: 0 }) + '\n';
+    const audioChunk = JSON.stringify({ type: 'audio-chunk', data: {}, payload_length: pcm.length }) + '\n';
+    const audioStop  = JSON.stringify({ type: 'audio-stop', data: {} }) + '\n';
+
     const { server, port } = await startMockServer((socket) => {
       socket.once('data', () => {
-        socket.end(FAKE_WAV);
+        socket.write(Buffer.concat([
+          Buffer.from(audioStart),
+          Buffer.from(audioChunk),
+          pcm,
+          Buffer.from(audioStop),
+        ]));
       });
     });
     servers.push(server);
@@ -47,7 +55,11 @@ describe('synthesise', () => {
     });
 
     expect(fs.existsSync(outPath)).toBe(true);
-    expect(fs.readFileSync(outPath)).toEqual(FAKE_WAV);
+    const wav = fs.readFileSync(outPath);
+    expect(wav.length).toBe(44 + pcm.length);            // 44-byte WAV header + PCM
+    expect(wav.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(wav.subarray(8, 12).toString('ascii')).toBe('WAVE');
+    expect(wav.subarray(44)).toEqual(pcm);                // PCM content preserved
   });
 
   it('handles Wyoming framed events with audio-chunk payloads', async () => {
@@ -57,6 +69,8 @@ describe('synthesise', () => {
       payload_length: payload.length,
     }) + '\n';
 
+    // Server sends an audio-chunk then closes without audio-stop; the client
+    // falls back to settling on connection close and wraps PCM in a WAV header.
     const { server, port } = await startMockServer((socket) => {
       socket.once('data', () => {
         socket.end(Buffer.concat([Buffer.from(event), payload]));
@@ -73,7 +87,10 @@ describe('synthesise', () => {
     });
 
     expect(fs.existsSync(outPath)).toBe(true);
-    expect(fs.readFileSync(outPath)).toEqual(payload);
+    const wav = fs.readFileSync(outPath);
+    expect(wav.length).toBe(44 + payload.length);
+    expect(wav.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(wav.subarray(44)).toEqual(payload);
   });
 
   it('rejects on timeout', async () => {
@@ -120,6 +137,33 @@ describe('synthesise', () => {
         timeoutMs: 3000,
         outputDir: tmpDir,
       }),
-    ).rejects.toThrow('empty');
+    ).rejects.toThrow('without sending audio');
+  });
+
+  it('raw-audio fallback: wraps non-Wyoming bytes in a WAV header', async () => {
+    // Simulate a server that streams raw PCM (with \n bytes in the data)
+    // then closes the connection — no Wyoming event framing at all.
+    const rawPcm = Buffer.concat([
+      Buffer.from('hello\nworld\n'),  // contains \n bytes that would fool the JSON parser
+      Buffer.alloc(20, 0x55),
+    ]);
+
+    const { server, port } = await startMockServer((socket) => {
+      socket.once('data', () => socket.end(rawPcm));
+    });
+    servers.push(server);
+
+    const tmpDir = makeTempDir();
+    const outPath = await synthesise('Test', 'raw.wav', {
+      host: '127.0.0.1',
+      port,
+      timeoutMs: 3000,
+      outputDir: tmpDir,
+    });
+
+    const wav = fs.readFileSync(outPath);
+    expect(wav.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(wav.subarray(8, 12).toString('ascii')).toBe('WAVE');
+    expect(wav.subarray(44)).toEqual(rawPcm);
   });
 });
