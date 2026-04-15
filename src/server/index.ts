@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'url';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -176,7 +177,9 @@ async function main(): Promise<void> {
   process.on('SIGINT', shutdown);
 }
 
-main().catch((err) => {
-  logger.error('Fatal server error', err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    logger.error('Fatal server error', err);
+    process.exit(1);
+  });
+}
