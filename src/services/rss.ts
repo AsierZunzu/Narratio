@@ -1,12 +1,14 @@
 import Parser from 'rss-parser';
 import type { Database } from 'better-sqlite3';
 import path from 'path';
+import { extract } from '@extractus/article-extractor';
 import { htmlToText } from '../utils/html.js';
 import { logger } from '../utils/logger.js';
 import {
   insertArticle,
   getPendingArticles,
   getRetryableArticles,
+  markArticleConverting,
   markArticleDone,
   markArticleFailed,
   markArticlePermanentlyFailed,
@@ -68,6 +70,20 @@ function deriveGuid(item: FeedItem): string {
   return item.guid ?? item.link ?? item.title ?? String(Date.now());
 }
 
+async function fetchFullContent(url: string, timeoutMs: number): Promise<string | null> {
+  try {
+    const article = await Promise.race([
+      extract(url),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+    if (!article?.content) return null;
+    return htmlToText(article.content) || null;
+  } catch (err) {
+    logger.warn(`Failed to fetch full content from ${url}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
 export interface RssServiceOptions {
   feedUrl: string;
   fetchTimeoutMs: number;
@@ -98,7 +114,17 @@ export async function processFeed(db: Database, opts: RssServiceOptions): Promis
     const item = raw as FeedItem;
     const guid = deriveGuid(item);
     const rawHtml = item.content ?? item['content:encoded'] ?? item.contentSnippet ?? '';
-    const content = htmlToText(rawHtml);
+    const rssContent = htmlToText(rawHtml);
+
+    // Attempt to fetch the full article from the URL; fall back to RSS content
+    let content = rssContent;
+    if (item.link) {
+      const full = await fetchFullContent(item.link, opts.fetchTimeoutMs);
+      if (full && full.length > rssContent.length) {
+        content = full;
+      }
+    }
+
     const imageUrl = extractImageUrl(item);
 
     const inserted = insertArticle(db, {
@@ -146,13 +172,16 @@ async function dispatchTts(
   const text = [title, content].filter(Boolean).join('. ');
   const filename = `${sanitiseFilename(guid)}.wav`;
 
+  logger.info(`Converting: ${title}`);
+  markArticleConverting(db, guid);
+
   try {
     await synthesise(text, filename, opts.tts);
     markArticleDone(db, guid, filename);
     logger.info(`TTS done: ${title}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`TTS failed for "${title}"`, err);
+    logger.error(`TTS failed for "${title}" (text length: ${text.length} chars, file: ${filename}): ${msg}`);
 
     // Check if permanently failed after this increment
     const article = db
@@ -162,10 +191,11 @@ async function dispatchTts(
     const retriesAfter = (article?.tts_retries ?? 0) + 1;
 
     if (opts.maxRetries > 0 && retriesAfter >= opts.maxRetries) {
-      markArticlePermanentlyFailed(db, guid);
-      logger.warn(`Article permanently failed (${retriesAfter} retries): ${title}`);
+      markArticlePermanentlyFailed(db, guid, msg);
+      logger.warn(`Article permanently failed after ${retriesAfter} retries: ${title}`);
     } else {
       markArticleFailed(db, guid, msg);
+      logger.warn(`Article marked failed (attempt ${retriesAfter}/${opts.maxRetries || '∞'}): ${title}`);
     }
   }
 }
