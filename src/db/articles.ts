@@ -24,6 +24,15 @@ export function getArticleByGuid(db: Database, guid: string): Article | undefine
   return db.prepare('SELECT * FROM articles WHERE guid = ?').get(guid) as Article | undefined;
 }
 
+export function markArticleConverting(db: Database, guid: string): void {
+  db.prepare(`UPDATE articles SET status = 'converting' WHERE guid = ?`).run(guid);
+}
+
+export function resetConvertingArticles(db: Database): number {
+  const result = db.prepare(`UPDATE articles SET status = 'pending' WHERE status = 'converting'`).run();
+  return result.changes;
+}
+
 export function markArticleDone(db: Database, guid: string, audioFile: string): void {
   db.prepare(`
     UPDATE articles SET status = 'done', audio_file = ?, error = NULL WHERE guid = ?
@@ -38,10 +47,10 @@ export function markArticleFailed(db: Database, guid: string, error: string): vo
   `).run(error, guid);
 }
 
-export function markArticlePermanentlyFailed(db: Database, guid: string): void {
+export function markArticlePermanentlyFailed(db: Database, guid: string, error: string): void {
   db.prepare(`
-    UPDATE articles SET status = 'failed' WHERE guid = ?
-  `).run(guid);
+    UPDATE articles SET status = 'failed', tts_retries = tts_retries + 1, error = ? WHERE guid = ?
+  `).run(error, guid);
 }
 
 export function markArticlePurged(db: Database, guid: string): void {
