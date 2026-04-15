@@ -2,6 +2,7 @@ import type { Article } from '../db/index.js';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
+  converting: 'Converting',
   done: 'Done',
   failed: 'Failed',
   purged: 'Purged',
@@ -25,6 +26,18 @@ function formatDate(d: string | null): string {
   }
 }
 
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ');
+}
+
+function wordCount(content: string | null): string {
+  if (!content || content.trim() === '') return '—';
+  const text = stripHtml(content).trim();
+  if (!text) return '—';
+  const count = text.split(/\s+/).filter(Boolean).length;
+  return count + ' w';
+}
+
 function statusBadge(status: string): string {
   return `<span class="badge badge-${escape(status)}">${escape(STATUS_LABELS[status] ?? status)}</span>`;
 }
@@ -33,6 +46,9 @@ function actionButtons(article: Article, baseUrl: string): string {
   const guid = escape(article.guid);
   const buttons: string[] = [];
 
+  if (article.link) {
+    buttons.push(`<a class="btn btn-link" href="${escape(article.link)}" target="_blank" rel="noopener">↗ Article</a>`);
+  }
   if (article.status === 'failed') {
     buttons.push(`<button class="btn btn-retry" data-action="retry" data-guid="${guid}">Retry</button>`);
   }
@@ -47,40 +63,19 @@ function actionButtons(article: Article, baseUrl: string): string {
   return buttons.join(' ');
 }
 
-function buildRows(articles: Article[], baseUrl: string, filterStatus: string): string {
-  const filtered = filterStatus === 'all' ? articles : articles.filter((a) => a.status === filterStatus);
 
-  if (filtered.length === 0) {
-    return `<tr><td colspan="6" class="empty">No articles found.</td></tr>`;
-  }
-
-  return filtered
-    .map(
-      (a) => `
-    <tr data-guid="${escape(a.guid)}" data-status="${escape(a.status)}">
-      <td class="col-title">
-        ${a.link ? `<a href="${escape(a.link)}" target="_blank" rel="noopener">${escape(a.title)}</a>` : escape(a.title)}
-      </td>
-      <td class="col-status">${statusBadge(a.status)}</td>
-      <td class="col-date">${escape(formatDate(a.pub_date))}</td>
-      <td class="col-retries">${a.status === 'failed' ? `${a.tts_retries} retries` : '—'}</td>
-      <td class="col-error">${a.status === 'failed' && a.error ? `<span class="error-msg" title="${escape(a.error)}">${escape(a.error.slice(0, 60))}${a.error.length > 60 ? '…' : ''}</span>` : ''}</td>
-      <td class="col-actions">${actionButtons(a, baseUrl)}</td>
-    </tr>`,
-    )
-    .join('');
-}
 
 export function renderDashboard(articles: Article[], baseUrl: string): string {
   const counts = {
     all: articles.length,
     pending: articles.filter((a) => a.status === 'pending').length,
+    converting: articles.filter((a) => a.status === 'converting').length,
     done: articles.filter((a) => a.status === 'done').length,
     failed: articles.filter((a) => a.status === 'failed').length,
     purged: articles.filter((a) => a.status === 'purged').length,
   };
 
-  const tabsHtml = (['all', 'pending', 'done', 'failed', 'purged'] as const)
+  const tabsHtml = (['all', 'pending', 'converting', 'done', 'failed', 'purged'] as const)
     .map(
       (s) =>
         `<button class="tab" data-filter="${s}">${s === 'all' ? 'All' : STATUS_LABELS[s]} <span class="tab-count">${counts[s]}</span></button>`,
@@ -89,16 +84,17 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
 
   // All rows rendered once; JS filters by data-status attribute
   const rowsHtml = articles.length === 0
-    ? `<tr><td colspan="6" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>`
+    ? `<tr><td colspan="7" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>`
     : articles
         .map(
           (a) => `
-    <tr data-guid="${escape(a.guid)}" data-status="${escape(a.status)}">
+    <tr data-guid="${escape(a.guid)}" data-status="${escape(a.status)}" data-content="${escape(a.content ?? '')}">
       <td class="col-title">
-        ${a.link ? `<a href="${escape(a.link)}" target="_blank" rel="noopener">${escape(a.title)}</a>` : escape(a.title)}
+        ${a.content ? `<button class="btn-view-content" data-guid="${escape(a.guid)}" title="View content">${escape(a.title)}</button>` : escape(a.title)}
       </td>
       <td class="col-status">${statusBadge(a.status)}</td>
       <td class="col-date">${escape(formatDate(a.pub_date))}</td>
+      <td class="col-words">${escape(wordCount(a.content))}</td>
       <td class="col-retries">${a.status === 'failed' ? `${a.tts_retries}×` : '—'}</td>
       <td class="col-error">${a.status === 'failed' && a.error ? `<span class="error-msg" title="${escape(a.error)}">${escape(a.error.slice(0, 60))}${a.error.length > 60 ? '…' : ''}</span>` : ''}</td>
       <td class="col-actions">${actionButtons(a, baseUrl)}</td>
@@ -141,18 +137,23 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
     .empty { color: #475569; padding: 24px; text-align: center; }
 
     .col-title { max-width: 340px; word-break: break-word; }
+    .col-words { white-space: nowrap; color: #64748b; font-variant-numeric: tabular-nums; }
     .col-retries { white-space: nowrap; color: #94a3b8; }
     .col-error { max-width: 200px; }
     .error-msg { color: #f87171; font-size: 12px; cursor: help; }
 
     .badge { border-radius: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .badge-pending { background: #334155; color: #94a3b8; }
-    .badge-done    { background: #14532d; color: #86efac; }
-    .badge-failed  { background: #450a0a; color: #fca5a5; }
-    .badge-purged  { background: #422006; color: #fdba74; }
+    .badge-pending    { background: #334155; color: #94a3b8; }
+    .badge-converting { background: #1e3a5f; color: #93c5fd; animation: pulse 1.4s ease-in-out infinite; }
+    .badge-done       { background: #14532d; color: #86efac; }
+    .badge-failed     { background: #450a0a; color: #fca5a5; }
+    .badge-purged     { background: #422006; color: #fdba74; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 
     .btn { border: none; border-radius: 5px; cursor: pointer; font-size: 12px; padding: 4px 10px; font-family: inherit; text-decoration: none; display: inline-block; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-link   { background: #1e2535; color: #94a3b8; }
+    .btn-link:hover   { background: #252d3f; color: #e2e8f0; text-decoration: none; }
     .btn-retry  { background: #1e3a5f; color: #93c5fd; }
     .btn-retry:hover  { background: #1d4ed8; }
     .btn-purge  { background: #422006; color: #fdba74; }
@@ -165,6 +166,20 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
     #toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; padding: 10px 16px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100; }
     #toast.show { opacity: 1; }
     #toast.error { border-color: #7f1d1d; color: #fca5a5; }
+
+    .btn-view-content { background: none; border: none; cursor: pointer; color: inherit; font: inherit; text-align: left; padding: 0; width: 100%; }
+    .btn-view-content:hover a, .btn-view-content:hover { color: #93c5fd; }
+
+    #content-modal { display: none; position: fixed; inset: 0; z-index: 200; }
+    #content-modal.open { display: flex; align-items: flex-end; justify-content: center; }
+    #content-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
+    #content-panel { position: relative; background: #1a1f2e; border: 1px solid #252d3f; border-radius: 12px 12px 0 0; width: 100%; max-width: 860px; max-height: 70vh; display: flex; flex-direction: column; }
+    #content-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #252d3f; gap: 12px; }
+    #content-panel-title { font-size: 14px; font-weight: 600; color: #e2e8f0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #content-panel-close { background: none; border: none; color: #64748b; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+    #content-panel-close:hover { color: #e2e8f0; background: #252d3f; }
+    #content-panel-body { overflow-y: auto; padding: 20px; flex: 1; }
+    #content-panel-body pre { white-space: pre-wrap; word-break: break-word; font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.7; color: #cbd5e1; }
   </style>
 </head>
 <body>
@@ -176,6 +191,7 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
   <div class="summary">
     <div class="stat"><div class="stat-value">${counts.all}</div><div class="stat-label">Total</div></div>
     <div class="stat"><div class="stat-value" style="color:#94a3b8">${counts.pending}</div><div class="stat-label">Pending</div></div>
+    <div class="stat"><div class="stat-value" style="color:#93c5fd">${counts.converting}</div><div class="stat-label">Converting</div></div>
     <div class="stat"><div class="stat-value" style="color:#86efac">${counts.done}</div><div class="stat-label">Done</div></div>
     <div class="stat"><div class="stat-value" style="color:#fca5a5">${counts.failed}</div><div class="stat-label">Failed</div></div>
     <div class="stat"><div class="stat-value" style="color:#fdba74">${counts.purged}</div><div class="stat-label">Purged</div></div>
@@ -190,6 +206,7 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
           <th>Title</th>
           <th>Status</th>
           <th>Date</th>
+          <th>Words</th>
           <th>Retries</th>
           <th>Error</th>
           <th>Actions</th>
@@ -202,6 +219,17 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
   </div>
 
   <div id="toast"></div>
+
+  <div id="content-modal">
+    <div id="content-backdrop"></div>
+    <div id="content-panel">
+      <div id="content-panel-header">
+        <span id="content-panel-title"></span>
+        <button id="content-panel-close" title="Close">✕</button>
+      </div>
+      <div id="content-panel-body"><pre id="content-panel-text"></pre></div>
+    </div>
+  </div>
 
   <script>
     const toast = document.getElementById('toast');
@@ -224,6 +252,39 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
           row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
         });
       });
+    });
+
+    // Content panel
+    const modal = document.getElementById('content-modal');
+    const backdrop = document.getElementById('content-backdrop');
+    const panelTitle = document.getElementById('content-panel-title');
+    const panelText = document.getElementById('content-panel-text');
+    const closeBtn = document.getElementById('content-panel-close');
+
+    function openContentPanel(title, content) {
+      panelTitle.textContent = title;
+      panelText.textContent = content;
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeContentPanel() {
+      modal.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeContentPanel);
+    backdrop.addEventListener('click', closeContentPanel);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContentPanel(); });
+
+    document.getElementById('articles-body').addEventListener('click', (e) => {
+      const viewBtn = e.target.closest('.btn-view-content');
+      if (!viewBtn) return;
+      const row = viewBtn.closest('tr[data-guid]');
+      if (!row) return;
+      const content = row.dataset.content || '';
+      const title = viewBtn.textContent.trim();
+      openContentPanel(title, content);
     });
 
     // Action buttons
