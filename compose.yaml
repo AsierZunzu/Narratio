@@ -5,8 +5,6 @@ services:
     command: --voice ${PIPER_VOICE:-en_US-lessac-medium}
     volumes:
       - ./data/piper:/data
-    ports:
-      - "10200:10200"
     healthcheck:
       test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.connect((\"localhost\",10200)); s.close()'"]
       interval: 10s
@@ -14,17 +12,24 @@ services:
       retries: 5
       start_period: 30s
 
-  server:
+  narratio:
     build: .
-    command: node dist/server/index.js
     restart: unless-stopped
     init: true
     environment:
       PORT: ${PORT:-3000}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
+      RSS_URL: ${RSS_URL}
+      POLL_INTERVAL: ${POLL_INTERVAL:-}
       PIPER_HOST: tts
       PIPER_PORT: "10200"
+      PIPER_VOICE: ${PIPER_VOICE:-en_US-lessac-medium}
       TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
+      TTS_MAX_RETRIES: ${TTS_MAX_RETRIES:-3}
+      RSS_FETCH_TIMEOUT: ${RSS_FETCH_TIMEOUT:-30000}
+      MAX_AUDIO_FILES: ${MAX_AUDIO_FILES:-}
+      MAX_AUDIO_SIZE_MB: ${MAX_AUDIO_SIZE_MB:-}
+      FORCE_RESET: ${FORCE_RESET:-}
       PODCAST_TITLE: ${PODCAST_TITLE:-Narratio}
       PODCAST_DESCRIPTION: ${PODCAST_DESCRIPTION:-}
       PODCAST_AUTHOR: ${PODCAST_AUTHOR:-Narratio Worker}
@@ -40,28 +45,12 @@ services:
       - "${PORT:-3000}:3000"
     volumes:
       - ./data/app:/app/data
-    depends_on:
-      tts:
-        condition: service_healthy
-
-  worker:
-    build: .
-    command: node dist/worker/index.js
-    restart: unless-stopped
-    init: true
-    environment:
-      RSS_URL: ${RSS_URL}
-      POLL_INTERVAL: ${POLL_INTERVAL:-}
-      PIPER_HOST: tts
-      PIPER_PORT: "10200"
-      TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
-      TTS_MAX_RETRIES: ${TTS_MAX_RETRIES:-3}
-      RSS_FETCH_TIMEOUT: ${RSS_FETCH_TIMEOUT:-30000}
-      MAX_AUDIO_FILES: ${MAX_AUDIO_FILES:-}
-      MAX_AUDIO_SIZE_MB: ${MAX_AUDIO_SIZE_MB:-}
-      FORCE_RESET: ${FORCE_RESET:-}
-    volumes:
-      - ./data/app:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       tts:
         condition: service_healthy
