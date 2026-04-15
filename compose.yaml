@@ -14,33 +14,17 @@ services:
       retries: 5
       start_period: 30s
 
-  narratio-worker:
+  server:
     build: .
-    restart: unless-stopped
-    command: node dist/worker/index.js
-    environment:
-      RSS_URL: ${RSS_URL}
-      POLL_INTERVAL: ${POLL_INTERVAL:-}
-      PIPER_HOST: tts
-      PIPER_PORT: "10200"
-      TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
-      TTS_MAX_RETRIES: ${TTS_MAX_RETRIES:-3}
-      RSS_FETCH_TIMEOUT: ${RSS_FETCH_TIMEOUT:-30000}
-      MAX_AUDIO_FILES: ${MAX_AUDIO_FILES:-}
-      MAX_AUDIO_SIZE_MB: ${MAX_AUDIO_SIZE_MB:-}
-    volumes:
-      - ./data/app:/app/data
-    depends_on:
-      tts:
-        condition: service_healthy
-
-  narratio-server:
-    build: .
-    restart: unless-stopped
     command: node dist/server/index.js
+    restart: unless-stopped
+    init: true
     environment:
       PORT: ${PORT:-3000}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
+      PIPER_HOST: tts
+      PIPER_PORT: "10200"
+      TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
       PODCAST_TITLE: ${PODCAST_TITLE:-Narratio}
       PODCAST_DESCRIPTION: ${PODCAST_DESCRIPTION:-}
       PODCAST_AUTHOR: ${PODCAST_AUTHOR:-Narratio Worker}
@@ -52,10 +36,30 @@ services:
       PODCAST_ITUNES_CATEGORY: ${PODCAST_ITUNES_CATEGORY:-Technology}
       UNAVAILABLE_MESSAGE: ${UNAVAILABLE_MESSAGE:-This content is no longer available on the server.}
       TTS_FAILED_MESSAGE: ${TTS_FAILED_MESSAGE:-This podcast episode could not be generated due to a text-to-speech error.}
-      PIPER_HOST: tts
-      PIPER_PORT: "10200"
     ports:
       - "${PORT:-3000}:3000"
+    volumes:
+      - ./data/app:/app/data
+    depends_on:
+      tts:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: node dist/worker/index.js
+    restart: unless-stopped
+    init: true
+    environment:
+      RSS_URL: ${RSS_URL}
+      POLL_INTERVAL: ${POLL_INTERVAL:-}
+      PIPER_HOST: tts
+      PIPER_PORT: "10200"
+      TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
+      TTS_MAX_RETRIES: ${TTS_MAX_RETRIES:-3}
+      RSS_FETCH_TIMEOUT: ${RSS_FETCH_TIMEOUT:-30000}
+      MAX_AUDIO_FILES: ${MAX_AUDIO_FILES:-}
+      MAX_AUDIO_SIZE_MB: ${MAX_AUDIO_SIZE_MB:-}
+      FORCE_RESET: ${FORCE_RESET:-}
     volumes:
       - ./data/app:/app/data
     depends_on:
