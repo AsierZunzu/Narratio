@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-export type ArticleStatus = 'pending' | 'done' | 'failed' | 'purged';
+export type ArticleStatus = 'pending' | 'converting' | 'done' | 'failed' | 'purged';
 
 export interface Article {
   guid: string;
