@@ -16,7 +16,7 @@ RSS Feed  ──►  Worker  ──►  Piper TTS  ──►  WAV files
                        ──►  GET /audio/:file
 ```
 
-Two independent processes share a SQLite database and an audio volume:
+A single `narratio` container runs both processes, sharing a SQLite database and audio volume with each other:
 
 - **Worker** — polls the RSS feed on a cron schedule, converts each new article to audio via Piper TTS over TCP, and runs cleanup to enforce disk quotas.
 - **Server** — serves the podcast RSS feed, static audio files, and a web dashboard.
@@ -70,6 +70,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 |---|---|---|
 | `RSS_URL` | *(required)* | RSS feed URL to poll |
 | `POLL_INTERVAL` | *(unset)* | Cron expression. If unset, runs once and exits |
+| `FORCE_RESET` | *(unset)* | Set to `true` to wipe DB + audio on container startup |
 | `TTS_TIMEOUT` | `300` | TTS timeout in seconds |
 | `TTS_MAX_RETRIES` | `3` | Max retry attempts per article. `0` = no retries |
 | `RSS_FETCH_TIMEOUT` | `30000` | RSS fetch timeout in milliseconds |
@@ -133,6 +134,7 @@ The web dashboard at `http://your-server:3000` shows all articles and their proc
 | Badge | Meaning |
 |---|---|
 | **Pending** | Waiting for TTS synthesis |
+| **Converting** | TTS synthesis in progress |
 | **Done** | Audio generated, visible in podcast feed |
 | **Failed** | TTS failed (see retry count and error) |
 | **Purged** | Audio deleted by cleanup quota; article still in feed with fallback audio |
@@ -141,19 +143,22 @@ The web dashboard at `http://your-server:3000` shows all articles and their proc
 
 | Button | Available on | Effect |
 |---|---|---|
+| ↗ Article | Articles with a source link | Opens original article in a new tab |
 | Retry | Failed articles | Resets retry counter → pending; worker will re-attempt on next poll |
 | Purge | Done articles | Deletes audio file immediately, frees disk space |
 | Delete | Any article | Removes article from DB entirely (will be re-ingested on next poll) |
+
+Click an article title to preview the plain-text content that was sent to TTS.
 
 ---
 
 ## Worker CLI flags
 
-Run these by overriding the worker container command:
+Run these by overriding the container command:
 
 ```bash
-docker compose run --rm narratio-worker node dist/worker/index.js --force-reset
-docker compose run --rm narratio-worker node dist/worker/index.js --retry-failed
+docker compose run --rm narratio node dist/worker/index.js --force-reset
+docker compose run --rm narratio node dist/worker/index.js --retry-failed
 ```
 
 | Flag | Effect |
@@ -200,7 +205,8 @@ Tests use in-memory SQLite and mock TCP servers — no Piper instance needed.
 | Service | Role |
 |---|---|
 | `tts` | Piper TTS engine (Wyoming TCP protocol, port 10200) |
-| `narratio-worker` | RSS poller + TTS dispatcher |
-| `narratio-server` | Web server (dashboard + RSS feed + audio) |
+| `narratio` | RSS worker + web server (both run inside one container via `docker-entrypoint.sh`) |
 
-Both app services depend on `tts` with a TCP health check and share the `./data/app` volume.
+`narratio` depends on `tts` with a TCP health check and mounts `./data/app` at `/app/data`.
+
+To trigger a one-off force-reset without overriding the command, set `FORCE_RESET=true` in your `.env` — the entrypoint will wipe the DB and audio before starting normally.
