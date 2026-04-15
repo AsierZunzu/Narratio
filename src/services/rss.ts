@@ -162,6 +162,22 @@ export async function processFeed(db: Database, opts: RssServiceOptions): Promis
   }
 }
 
+/** Max characters sent to Piper per article. Longer texts cause OOM crashes. */
+const TTS_MAX_CHARS = 50_000;
+
+/**
+ * Strip characters that confuse Piper's text-normaliser:
+ *  - C0/C1 control chars (except tab/newline/CR)
+ *  - Null bytes
+ *  - Unicode private-use / replacement characters
+ */
+function sanitiseText(raw: string): string {
+  return raw
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD\uE000-\uF8FF]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function dispatchTts(
   db: Database,
   guid: string,
@@ -169,10 +185,25 @@ async function dispatchTts(
   content: string | null,
   opts: RssServiceOptions,
 ): Promise<void> {
-  const text = [title, content].filter(Boolean).join('. ');
+  const rawText = [title, content].filter(Boolean).join('. ');
+  let text = sanitiseText(rawText);
+
+  if (text.length === 0) {
+    logger.warn(`Skipping TTS for "${title}" — no usable text after sanitisation`);
+    markArticlePermanentlyFailed(db, guid, 'No usable text content');
+    return;
+  }
+
+  if (text.length > TTS_MAX_CHARS) {
+    logger.warn(
+      `Text for "${title}" is ${text.length} chars — truncating to ${TTS_MAX_CHARS} to avoid Piper OOM`,
+    );
+    text = text.slice(0, TTS_MAX_CHARS);
+  }
+
   const filename = `${sanitiseFilename(guid)}.wav`;
 
-  logger.info(`Converting: ${title}`);
+  logger.info(`Converting: ${title} (${text.length} chars)`);
   markArticleConverting(db, guid);
 
   try {
