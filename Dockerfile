@@ -20,9 +20,13 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
-RUN mkdir -p /app/data/audio && chown -R narratio:narratio /app/data
+RUN mkdir -p /app/data/audio && chown -R narratio:narratio /app/data \
+    && chmod +x docker-entrypoint.sh
 
 USER narratio
 
 EXPOSE 3000
+
+CMD ["./docker-entrypoint.sh"]
