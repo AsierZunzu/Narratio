@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS articles (
   audio_file TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   tts_retries INTEGER NOT NULL DEFAULT 0,
+  tts_elapsed_ms INTEGER,
   error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -152,7 +153,7 @@ describe('POST /api/articles/:guid/purge', () => {
     const { db, dbPath } = makeTempDb();
     insertArticle(db, { guid: 'pur1', feed_url: 'https://x.com/feed', title: 'Purge Me', link: null, pub_date: null, content: null, image_url: null });
     // Mark done with a non-existent audio file — the unlink will silently fail
-    markArticleDone(db, 'pur1', 'pur1.wav');
+    markArticleDone(db, 'pur1', 'pur1.wav', 0);
     db.close();
 
     const app = createApp(dbPath);

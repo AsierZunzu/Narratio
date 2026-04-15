@@ -30,6 +30,12 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ');
 }
 
+function formatElapsed(ms: number | null): string {
+  if (ms == null) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 function wordCount(content: string | null): string {
   if (!content || content.trim() === '') return '—';
   const text = stripHtml(content).trim();
@@ -84,7 +90,7 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
 
   // All rows rendered once; JS filters by data-status attribute
   const rowsHtml = articles.length === 0
-    ? `<tr><td colspan="7" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>`
+    ? `<tr><td colspan="8" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>`
     : articles
         .map(
           (a) => `
@@ -95,6 +101,7 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
       <td class="col-status">${statusBadge(a.status)}</td>
       <td class="col-date">${escape(formatDate(a.pub_date))}</td>
       <td class="col-words">${escape(wordCount(a.content))}</td>
+      <td class="col-tts-time">${escape(formatElapsed(a.tts_elapsed_ms))}</td>
       <td class="col-retries">${a.status === 'failed' ? `${a.tts_retries}×` : '—'}</td>
       <td class="col-error">${a.status === 'failed' && a.error ? `<span class="error-msg" title="${escape(a.error)}">${escape(a.error.slice(0, 60))}${a.error.length > 60 ? '…' : ''}</span>` : ''}</td>
       <td class="col-actions">${actionButtons(a, baseUrl)}</td>
@@ -138,6 +145,7 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
 
     .col-title { max-width: 340px; word-break: break-word; }
     .col-words { white-space: nowrap; color: #64748b; font-variant-numeric: tabular-nums; }
+    .col-tts-time { white-space: nowrap; color: #64748b; font-variant-numeric: tabular-nums; }
     .col-retries { white-space: nowrap; color: #94a3b8; }
     .col-error { max-width: 200px; }
     .error-msg { color: #f87171; font-size: 12px; cursor: help; }
@@ -207,6 +215,7 @@ export function renderDashboard(articles: Article[], baseUrl: string): string {
           <th>Status</th>
           <th>Date</th>
           <th>Words</th>
+          <th>TTS Time</th>
           <th>Retries</th>
           <th>Error</th>
           <th>Actions</th>

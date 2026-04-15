@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS articles (
   audio_file TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   tts_retries INTEGER NOT NULL DEFAULT 0,
+  tts_elapsed_ms INTEGER,
   error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -57,7 +58,7 @@ describe('buildFeedXml', () => {
 
   it('includes done articles with their audio URL', () => {
     insertArticle(db, { guid: 'g1', feed_url: 'https://example.com/feed', title: 'My Article', link: null, pub_date: null, content: 'Hello', image_url: null });
-    markArticleDone(db, 'g1', 'g1.wav');
+    markArticleDone(db, 'g1', 'g1.wav', 0);
 
     const xml = buildFeedXml(db, CONFIG);
     expect(xml).toContain('My Article');
@@ -66,7 +67,7 @@ describe('buildFeedXml', () => {
 
   it('prefixes purged articles with [PURGED]', () => {
     insertArticle(db, { guid: 'g2', feed_url: 'https://example.com/feed', title: 'Gone', link: null, pub_date: null, content: null, image_url: null });
-    markArticleDone(db, 'g2', 'g2.wav');
+    markArticleDone(db, 'g2', 'g2.wav', 0);
     markArticlePurged(db, 'g2');
 
     const xml = buildFeedXml(db, CONFIG);
