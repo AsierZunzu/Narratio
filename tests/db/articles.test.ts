@@ -23,8 +23,9 @@ CREATE TABLE IF NOT EXISTS articles (
   image_url    TEXT,
   audio_file   TEXT,
   status       TEXT NOT NULL DEFAULT 'pending',
-  tts_retries  INTEGER NOT NULL DEFAULT 0,
-  error        TEXT,
+  tts_retries     INTEGER NOT NULL DEFAULT 0,
+  tts_elapsed_ms  INTEGER,
+  error           TEXT,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `;
@@ -67,7 +68,7 @@ describe('markArticleDone', () => {
   it('sets status to done and stores audio_file', () => {
     const db = makeDb();
     insertArticle(db, BASE_ARTICLE);
-    markArticleDone(db, BASE_ARTICLE.guid, 'test-guid-1.wav');
+    markArticleDone(db, BASE_ARTICLE.guid, 'test-guid-1.wav', 0);
     const row = getArticleByGuid(db, BASE_ARTICLE.guid);
     expect(row?.status).toBe('done');
     expect(row?.audio_file).toBe('test-guid-1.wav');
@@ -100,7 +101,7 @@ describe('markArticlePurged', () => {
   it('sets status to purged and clears audio_file', () => {
     const db = makeDb();
     insertArticle(db, BASE_ARTICLE);
-    markArticleDone(db, BASE_ARTICLE.guid, 'audio.wav');
+    markArticleDone(db, BASE_ARTICLE.guid, 'audio.wav', 0);
     markArticlePurged(db, BASE_ARTICLE.guid);
     const row = getArticleByGuid(db, BASE_ARTICLE.guid);
     expect(row?.status).toBe('purged');
@@ -126,7 +127,7 @@ describe('getPendingArticles', () => {
     const db = makeDb();
     insertArticle(db, BASE_ARTICLE);
     insertArticle(db, { ...BASE_ARTICLE, guid: 'guid-2', title: 'Done' });
-    markArticleDone(db, 'guid-2', 'guid-2.wav');
+    markArticleDone(db, 'guid-2', 'guid-2.wav', 0);
     const pending = getPendingArticles(db);
     expect(pending).toHaveLength(1);
     expect(pending[0]?.guid).toBe(BASE_ARTICLE.guid);
@@ -160,7 +161,7 @@ describe('getPublishedArticles', () => {
     insertArticle(db, { ...BASE_ARTICLE, guid: 'g2' });
     insertArticle(db, { ...BASE_ARTICLE, guid: 'g3' });
     insertArticle(db, { ...BASE_ARTICLE, guid: 'g4' });
-    markArticleDone(db, 'g1', 'g1.wav');
+    markArticleDone(db, 'g1', 'g1.wav', 0);
     markArticlePurged(db, 'g2');
     markArticleFailed(db, 'g3', 'err');
     // g4 stays pending — should NOT appear

@@ -207,9 +207,11 @@ async function dispatchTts(
   markArticleConverting(db, guid);
 
   try {
+    const ttsStart = Date.now();
     await synthesise(text, filename, opts.tts);
-    markArticleDone(db, guid, filename);
-    logger.info(`TTS done: ${title}`);
+    const elapsedMs = Date.now() - ttsStart;
+    markArticleDone(db, guid, filename, elapsedMs);
+    logger.info(`TTS done: ${title} (${(elapsedMs / 1000).toFixed(1)}s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`TTS failed for "${title}" (text length: ${text.length} chars, file: ${filename}): ${msg}`);

@@ -33,10 +33,10 @@ export function resetConvertingArticles(db: Database): number {
   return result.changes;
 }
 
-export function markArticleDone(db: Database, guid: string, audioFile: string): void {
+export function markArticleDone(db: Database, guid: string, audioFile: string, elapsedMs: number): void {
   db.prepare(`
-    UPDATE articles SET status = 'done', audio_file = ?, error = NULL WHERE guid = ?
-  `).run(audioFile, guid);
+    UPDATE articles SET status = 'done', audio_file = ?, tts_elapsed_ms = ?, error = NULL WHERE guid = ?
+  `).run(audioFile, elapsedMs, guid);
 }
 
 export function markArticleFailed(db: Database, guid: string, error: string): void {

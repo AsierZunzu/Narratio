@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS articles (
   audio_file TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   tts_retries INTEGER NOT NULL DEFAULT 0,
+  tts_elapsed_ms INTEGER,
   error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
