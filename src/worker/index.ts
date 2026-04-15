@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
-import { resetFailedRetries } from '../db/articles.js';
+import { resetFailedRetries, resetConvertingArticles } from '../db/articles.js';
 import { processFeed } from '../services/rss.js';
 import { runCleanup } from '../services/cleanup.js';
 import { env } from '../utils/env.js';
@@ -35,9 +35,13 @@ function buildCleanupOpts() {
   };
 }
 
-async function runOnce(): Promise<void> {
+async function runOnce(isFirst = false): Promise<void> {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
   const db = getDb(DB_PATH);
+  if (isFirst) {
+    const stuck = resetConvertingArticles(db);
+    if (stuck > 0) logger.warn(`Reset ${stuck} stuck 'converting' articles to pending`);
+  }
   try {
     await processFeed(db, buildRssOpts());
     runCleanup(db, buildCleanupOpts());
@@ -72,7 +76,13 @@ async function main(): Promise<void> {
   const forceReset = args.includes('--force-reset');
   const retryFailed = args.includes('--retry-failed');
 
-  if (forceReset) handleForceReset();
+  if (forceReset) {
+    handleForceReset();
+    process.exit(0);
+  }
+  if (process.env['FORCE_RESET'] === 'true') {
+    handleForceReset();
+  }
   if (retryFailed) handleRetryFailed();
 
   const pollInterval = env.POLL_INTERVAL();
@@ -94,8 +104,8 @@ async function main(): Promise<void> {
 
   logger.info('Worker starting');
 
-  // Run immediately on startup
-  await runOnce();
+  // Run immediately on startup (reset any stale converting articles first)
+  await runOnce(true);
 
   if (!pollInterval) {
     logger.info('No POLL_INTERVAL set — running once and exiting');
