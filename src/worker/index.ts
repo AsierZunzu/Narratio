@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
 import { resetFailedRetries, resetConvertingArticles } from '../db/articles.js';
-import { processFeed } from '../services/rss.js';
+import { processFeed, processPendingArticles } from '../services/rss.js';
 import { runCleanup } from '../services/cleanup.js';
 import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
@@ -12,10 +12,8 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 
-function buildRssOpts() {
+function buildTtsOpts() {
   return {
-    feedUrl: env.RSS_URL(),
-    fetchTimeoutMs: env.RSS_FETCH_TIMEOUT(),
     maxRetries: env.TTS_MAX_RETRIES(),
     tts: {
       host: env.PIPER_HOST(),
@@ -27,6 +25,14 @@ function buildRssOpts() {
   };
 }
 
+function buildRssOpts() {
+  return {
+    feedUrl: env.RSS_URL(),
+    fetchTimeoutMs: env.RSS_FETCH_TIMEOUT(),
+    ...buildTtsOpts(),
+  };
+}
+
 function buildCleanupOpts() {
   return {
     maxAudioFiles: env.MAX_AUDIO_FILES(),
@@ -35,7 +41,14 @@ function buildCleanupOpts() {
   };
 }
 
+let isRunning = false;
+
 async function runOnce(isFirst = false): Promise<void> {
+  if (isRunning) {
+    logger.info('Skipping RSS poll — previous run still in progress');
+    return;
+  }
+  isRunning = true;
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
   const db = getDb(DB_PATH);
   if (isFirst) {
@@ -47,6 +60,21 @@ async function runOnce(isFirst = false): Promise<void> {
     runCleanup(db, buildCleanupOpts());
   } catch (err) {
     logger.error('Worker run failed', err);
+  } finally {
+    isRunning = false;
+  }
+}
+
+async function runPendingCheck(): Promise<void> {
+  if (isRunning) return;
+  isRunning = true;
+  try {
+    const db = getDb(DB_PATH);
+    await processPendingArticles(db, buildTtsOpts());
+  } catch (err) {
+    logger.error('Pending check failed', err);
+  } finally {
+    isRunning = false;
   }
 }
 
@@ -88,13 +116,13 @@ async function main(): Promise<void> {
   const pollInterval = env.POLL_INTERVAL();
 
   let shuttingDown = false;
-  let cronTask: cron.ScheduledTask | null = null;
+  const cronTasks: cron.ScheduledTask[] = [];
 
   const shutdown = () => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info('Worker shutting down…');
-    if (cronTask) cronTask.stop();
+    for (const task of cronTasks) task.stop();
     closeDb();
     process.exit(0);
   };
@@ -119,11 +147,18 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  logger.info(`Scheduling poll: ${pollInterval}`);
-  cronTask = cron.schedule(pollInterval, async () => {
+  logger.info(`Scheduling RSS poll: ${pollInterval}`);
+  cronTasks.push(cron.schedule(pollInterval, async () => {
     if (shuttingDown) return;
     await runOnce();
-  });
+  }));
+
+  // Check every minute for pending/retryable work (e.g. triggered via web UI)
+  cronTasks.push(cron.schedule('* * * * *', async () => {
+    if (shuttingDown) return;
+    await runPendingCheck();
+  }));
+  logger.info('Scheduling pending check: every minute');
 }
 
 main().catch((err) => {

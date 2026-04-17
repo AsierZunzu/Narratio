@@ -85,12 +85,36 @@ async function fetchFullContent(url: string, timeoutMs: number): Promise<string 
   }
 }
 
-export interface RssServiceOptions {
-  feedUrl: string;
-  fetchTimeoutMs: number;
+export interface TtsBatchOptions {
   maxRetries: number;
   tts: TtsOptions;
   audioDir: string;
+}
+
+export interface RssServiceOptions extends TtsBatchOptions {
+  feedUrl: string;
+  fetchTimeoutMs: number;
+}
+
+export async function processPendingArticles(db: Db, opts: TtsBatchOptions): Promise<void> {
+  // Snapshot retryable articles BEFORE processing pending ones, so articles
+  // that fail in this run are not immediately retried in the same pass.
+  const retryable = opts.maxRetries > 0 ? getRetryableArticles(db, opts.maxRetries) : [];
+
+  const pending = getPendingArticles(db);
+  if (pending.length === 0 && retryable.length === 0) return;
+
+  logger.info(`Processing ${pending.length} pending articles`);
+  for (const article of pending) {
+    await dispatchTts(db, article.guid, article.title, article.content, opts);
+  }
+
+  if (retryable.length > 0) {
+    logger.info(`Retrying ${retryable.length} failed articles`);
+    for (const article of retryable) {
+      await dispatchTts(db, article.guid, article.title, article.content, opts);
+    }
+  }
 }
 
 export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void> {
@@ -117,7 +141,6 @@ export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void
     const rawHtml = item.content ?? item['content:encoded'] ?? item.contentSnippet ?? '';
     const rssContent = htmlToText(rawHtml);
 
-    // Attempt to fetch the full article from the URL; fall back to RSS content
     let content = rssContent;
     if (item.link) {
       const full = await fetchFullContent(item.link, opts.fetchTimeoutMs);
@@ -143,24 +166,7 @@ export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void
     }
   }
 
-  // Snapshot retryable articles BEFORE processing pending ones, so articles
-  // that fail in this run are not immediately retried in the same pass.
-  const retryable = opts.maxRetries > 0 ? getRetryableArticles(db, opts.maxRetries) : [];
-
-  // Process all pending articles (newly inserted + any that were pending before)
-  const pending = getPendingArticles(db);
-  logger.info(`Processing ${pending.length} pending articles`);
-  for (const article of pending) {
-    await dispatchTts(db, article.guid, article.title, article.content, opts);
-  }
-
-  // Retry previously failed articles that hadn't hit the limit
-  if (retryable.length > 0) {
-    logger.info(`Retrying ${retryable.length} failed articles`);
-    for (const article of retryable) {
-      await dispatchTts(db, article.guid, article.title, article.content, opts);
-    }
-  }
+  await processPendingArticles(db, opts);
 }
 
 /** Max characters sent to Piper per article. Longer texts cause OOM crashes. */
@@ -184,7 +190,7 @@ async function dispatchTts(
   guid: string,
   title: string,
   content: string | null,
-  opts: RssServiceOptions,
+  opts: TtsBatchOptions,
 ): Promise<void> {
   const rawText = [title, content].filter(Boolean).join('. ');
   let text = sanitiseText(rawText);
