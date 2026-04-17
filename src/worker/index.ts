@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
-import { resetFailedRetries, resetConvertingArticles } from '../db/articles.js';
+import { resetFailedRetries, resetConvertingArticles, resetAllArticlesForRegen } from '../db/articles.js';
 import { processFeed, processPendingArticles } from '../services/rss.js';
 import { runCleanup } from '../services/cleanup.js';
 import { env } from '../utils/env.js';
@@ -91,6 +91,19 @@ function handleForceReset(): void {
   logger.info('force-reset complete');
 }
 
+function handleRegenAudio(): void {
+  logger.warn('--regen-audio: deleting all audio files and resetting all articles to pending');
+  fs.mkdirSync(AUDIO_DIR, { recursive: true });
+  if (fs.existsSync(AUDIO_DIR)) {
+    for (const file of fs.readdirSync(AUDIO_DIR)) {
+      if (file.endsWith('.wav')) fs.rmSync(path.join(AUDIO_DIR, file), { force: true });
+    }
+  }
+  const db = getDb(DB_PATH);
+  const count = resetAllArticlesForRegen(db);
+  logger.info(`Deleted audio files and reset ${count} articles to pending`);
+}
+
 function handleRetryFailed(): void {
   logger.info('--retry-failed: resetting TTS retry counters');
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
@@ -103,6 +116,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const forceReset = args.includes('--force-reset');
   const retryFailed = args.includes('--retry-failed');
+  const regenAudio = args.includes('--regen-audio');
 
   if (forceReset) {
     handleForceReset();
@@ -110,6 +124,10 @@ async function main(): Promise<void> {
   }
   if (process.env['FORCE_RESET'] === 'true') {
     handleForceReset();
+  }
+  if (regenAudio) {
+    handleRegenAudio();
+    process.exit(0);
   }
   if (retryFailed) handleRetryFailed();
 

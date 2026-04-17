@@ -113,6 +113,14 @@ export function deleteArticle(db: Db, guid: string): boolean {
   return result.changes > 0;
 }
 
+export function resetAllArticlesForRegen(db: Db): number {
+  const result = db.update(articles)
+    .set({ tts_retries: 0, status: 'pending', audio_file: null, error: null, tts_elapsed_ms: null })
+    .where(inArray(articles.status, ['done', 'failed', 'purged', 'converting']))
+    .run();
+  return result.changes;
+}
+
 export function resetArticleRetries(db: Db, guid: string): boolean {
   const result = db.update(articles)
     .set({ tts_retries: 0, status: 'pending', error: null })

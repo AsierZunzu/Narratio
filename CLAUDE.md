@@ -24,8 +24,16 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 
 | Entry point | Role |
 |---|---|
-| `src/worker/index.ts` | RSS poller + TTS dispatcher. Runs once on startup, then on `POLL_INTERVAL` cron if set. Handles `--force-reset` and `--retry-failed` CLI flags. |
+| `src/worker/index.ts` | RSS poller + TTS dispatcher. Runs once on startup, then on `POLL_INTERVAL` cron if set. Handles `--force-reset`, `--retry-failed`, and `--regen-audio` CLI flags. |
 | `src/server/index.ts` | Express HTTP server. Two routes: `GET /audio/:file` (static WAV files) and `GET /rss` (podcast XML). |
+
+### Worker CLI flags
+
+| Flag | Behaviour |
+|---|---|
+| `--force-reset` | Deletes all audio files and the entire DB, then exits. Next run starts from scratch. |
+| `--retry-failed` | Resets `tts_retries` to 0 and status to `pending` for all `failed` articles, then continues normal startup. |
+| `--regen-audio` | Deletes all `.wav` files from `data/audio/` and resets every article (any status) to `pending` with zero retries, then exits. Useful when you want to regenerate audio with a different TTS model/voice without losing article history. |
 
 ### Data flow (worker)
 
@@ -39,7 +47,7 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 
 `src/db/schema.ts` — single `articles` table. Status lifecycle: `pending` → `converting` → `done` | `failed` → `purged`.
 
-`src/db/articles.ts` — all DB queries as plain exported functions accepting a `Db` argument (no class, no global state).
+`src/db/articles.ts` — all DB queries as plain exported functions accepting a `Db` argument (no class, no global state). `resetAllArticlesForRegen` resets every article to `pending` with zero retries and clears `audio_file`; used by `--regen-audio`.
 
 ### Server
 
