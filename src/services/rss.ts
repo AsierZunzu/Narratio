@@ -192,7 +192,7 @@ async function dispatchTts(
   content: string | null,
   opts: TtsBatchOptions,
 ): Promise<void> {
-  const rawText = [title, content].filter(Boolean).join('. ');
+  const rawText = [title, content].filter(Boolean).join("\n");
   let text = sanitiseText(rawText);
 
   if (text.length === 0) {
