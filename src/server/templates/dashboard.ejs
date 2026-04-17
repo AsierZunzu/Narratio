@@ -173,12 +173,52 @@
   </div>
 
   <script>
+    const STATUS_LABELS = { pending: 'Pending', converting: 'Converting', done: 'Done', failed: 'Failed', purged: 'Purged' };
+
     const toast = document.getElementById('toast');
     function showToast(msg, isError) {
       toast.textContent = msg;
       toast.className = 'show' + (isError ? ' error' : '');
       clearTimeout(toast._t);
       toast._t = setTimeout(() => { toast.className = ''; }, 3000);
+    }
+
+    function recalcCounts() {
+      const rows = [...document.querySelectorAll('#articles-body tr[data-status]')];
+      const counts = { all: rows.length, pending: 0, converting: 0, done: 0, failed: 0, purged: 0 };
+      rows.forEach(r => { const s = r.dataset.status; if (s in counts) counts[s]++; });
+      document.querySelectorAll('.stat').forEach(stat => {
+        const label = stat.querySelector('.stat-label').textContent.toLowerCase();
+        if (label in counts) stat.querySelector('.stat-value').textContent = counts[label];
+      });
+      document.querySelectorAll('.tab').forEach(tab => {
+        const f = tab.dataset.filter;
+        tab.querySelector('.tab-count').textContent = f === 'all' ? counts.all : (counts[f] ?? 0);
+      });
+    }
+
+    function applyActiveFilter(row) {
+      const filter = document.querySelector('.tab.active')?.dataset.filter;
+      row.style.display = (!filter || filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+    }
+
+    function applyAction(action, row, btn) {
+      if (action === 'delete') {
+        row.remove();
+        recalcCounts();
+        return;
+      }
+      const newStatus = action === 'retry' ? 'pending' : 'purged';
+      row.dataset.status = newStatus;
+      row.querySelector('.col-status').innerHTML = `<span class="badge badge-${newStatus}">${STATUS_LABELS[newStatus]}</span>`;
+      if (action === 'retry') {
+        btn.remove();
+      } else {
+        row.querySelector('[data-action="purge"]')?.remove();
+        row.querySelector('.btn-audio')?.remove();
+      }
+      applyActiveFilter(row);
+      recalcCounts();
     }
 
     // Filter tabs
@@ -223,9 +263,7 @@
       if (!viewBtn) return;
       const row = viewBtn.closest('tr[data-guid]');
       if (!row) return;
-      const content = row.dataset.content || '';
-      const title = viewBtn.textContent.trim();
-      openContentPanel(title, content);
+      openContentPanel(viewBtn.textContent.trim(), row.dataset.content || '');
     });
 
     // Action buttons
@@ -235,23 +273,19 @@
       const { action, guid } = btn.dataset;
       if (action === 'delete' && !confirm('Delete this article permanently?')) return;
 
+      const row = btn.closest('tr[data-guid]');
       btn.disabled = true;
       try {
-        let res;
-        if (action === 'delete') {
-          res = await fetch('/api/articles/' + encodeURIComponent(guid), { method: 'DELETE' });
-        } else {
-          res = await fetch('/api/articles/' + encodeURIComponent(guid) + '/' + action, { method: 'POST' });
-        }
+        const url = '/api/articles/' + encodeURIComponent(guid) + (action === 'delete' ? '' : '/' + action);
+        const res = await fetch(url, { method: action === 'delete' ? 'DELETE' : 'POST' });
         if (!res.ok) {
-          const txt = await res.text();
-          showToast('Error: ' + txt, true);
+          showToast('Error: ' + await res.text(), true);
           btn.disabled = false;
         } else {
           showToast(action.charAt(0).toUpperCase() + action.slice(1) + ' successful', false);
-          setTimeout(() => location.reload(), 600);
+          applyAction(action, row, btn);
         }
-      } catch (err) {
+      } catch {
         showToast('Network error', true);
         btn.disabled = false;
       }

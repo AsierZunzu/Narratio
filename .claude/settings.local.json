@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm show:*)",
+      "Bash(npm install:*)",
+      "Bash(npm --version)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(docker compose:*)",
+      "Bash(curl:*)",
+      "Bash(docker exec:*)",
+      "Bash(npx tsc:*)",
+      "Bash(docker version *)",
+      "Bash(docker context show *)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(sqlite3 data/app/narratio.db)"
+    ]
+  }
+}
