@@ -173,7 +173,27 @@
   </div>
 
   <script>
+    const BASE_URL = '<%= baseUrl %>';
     const STATUS_LABELS = { pending: 'Pending', converting: 'Converting', done: 'Done', failed: 'Failed', purged: 'Purged' };
+
+    function escAttr(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function clientFormatDate(d) {
+      if (!d) return '—';
+      try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+      catch { return String(d); }
+    }
+    function clientFormatElapsed(ms) {
+      if (ms == null) return '—';
+      return ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(1) + 's';
+    }
+    function clientWordCount(content) {
+      if (!content) return '—';
+      const text = content.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').trim();
+      if (!text) return '—';
+      return text.split(/\s+/).filter(Boolean).length + ' w';
+    }
 
     const toast = document.getElementById('toast');
     function showToast(msg, isError) {
@@ -213,12 +233,128 @@
       row.querySelector('.col-status').innerHTML = `<span class="badge badge-${newStatus}">${STATUS_LABELS[newStatus]}</span>`;
       if (action === 'retry') {
         btn.remove();
+        row.querySelector('.col-error').innerHTML = '';
+        row.querySelector('.col-tts-time').textContent = '—';
+        row.querySelector('.col-retries').textContent = '—';
       } else {
         row.querySelector('[data-action="purge"]')?.remove();
         row.querySelector('.btn-audio')?.remove();
       }
       applyActiveFilter(row);
       recalcCounts();
+    }
+
+    function applyFilter() {
+      const filter = document.querySelector('.tab.active')?.dataset.filter ?? 'all';
+      document.querySelectorAll('#articles-body tr[data-status]').forEach(row => {
+        row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+      });
+    }
+
+    function buildRow(a) {
+      const label = STATUS_LABELS[a.status] || a.status;
+      const content = a.content || '';
+
+      const titleCell = content
+        ? `<button class="btn-view-content" data-guid="${escAttr(a.guid)}" title="View content">${escAttr(a.title)}</button>`
+        : escAttr(a.title);
+
+      let errorHtml = '';
+      if (a.status === 'failed' && a.error) {
+        const msg = a.error.length > 60 ? a.error.slice(0, 60) + '…' : a.error;
+        errorHtml = `<span class="error-msg" title="${escAttr(a.error)}">${escAttr(msg)}</span>`;
+      }
+
+      let actions = '';
+      if (a.link) actions += `<a class="btn btn-link" href="${escAttr(a.link)}" target="_blank" rel="noopener">↗ Article</a> `;
+      if (a.status === 'failed') actions += `<button class="btn btn-retry" data-action="retry" data-guid="${escAttr(a.guid)}">Retry</button> `;
+      if (a.status === 'done') actions += `<button class="btn btn-purge" data-action="purge" data-guid="${escAttr(a.guid)}">Purge</button> `;
+      if (a.status === 'done' && a.audio_file) actions += `<a class="btn btn-audio" href="${BASE_URL}/audio/${encodeURIComponent(a.audio_file)}">▶ Audio</a> `;
+      actions += `<button class="btn btn-delete" data-action="delete" data-guid="${escAttr(a.guid)}">Delete</button>`;
+
+      return `<tr data-guid="${escAttr(a.guid)}" data-status="${escAttr(a.status)}" data-content="${escAttr(content)}">
+        <td class="col-title">${titleCell}</td>
+        <td class="col-status"><span class="badge badge-${escAttr(a.status)}">${escAttr(label)}</span></td>
+        <td class="col-date">${clientFormatDate(a.pub_date)}</td>
+        <td class="col-words">${clientWordCount(a.content)}</td>
+        <td class="col-tts-time">${clientFormatElapsed(a.tts_elapsed_ms)}</td>
+        <td class="col-retries">${a.status === 'failed' ? escAttr(String(a.tts_retries)) + '×' : '—'}</td>
+        <td class="col-error">${errorHtml}</td>
+        <td class="col-actions">${actions}</td>
+      </tr>`;
+    }
+
+    function reconcile(apiArticles) {
+      const tbody = document.getElementById('articles-body');
+      const savedY = window.scrollY;
+
+      const apiMap = new Map(apiArticles.map(a => [a.guid, a]));
+
+      const domRows = new Map();
+      tbody.querySelectorAll('tr[data-guid]').forEach(tr => domRows.set(tr.dataset.guid, tr));
+
+      if (apiArticles.length > 0) {
+        tbody.querySelector('tr:not([data-guid])')?.remove();
+      }
+
+      let changed = false;
+
+      for (const article of apiArticles) {
+        const existing = domRows.get(article.guid);
+        if (existing) {
+          domRows.delete(article.guid);
+          if (existing.querySelector('[data-action]:disabled')) continue;
+          if (existing.dataset.status === article.status) continue;
+
+          existing.dataset.status = article.status;
+          existing.dataset.content = article.content || '';
+          existing.querySelector('.col-status').innerHTML =
+            `<span class="badge badge-${escAttr(article.status)}">${STATUS_LABELS[article.status] || article.status}</span>`;
+          existing.querySelector('.col-words').textContent = clientWordCount(article.content);
+          existing.querySelector('.col-tts-time').textContent = clientFormatElapsed(article.tts_elapsed_ms);
+          existing.querySelector('.col-retries').textContent = article.status === 'failed' ? article.tts_retries + '×' : '—';
+
+          let errorHtml = '';
+          if (article.status === 'failed' && article.error) {
+            const msg = article.error.length > 60 ? article.error.slice(0, 60) + '…' : article.error;
+            errorHtml = `<span class="error-msg" title="${escAttr(article.error)}">${escAttr(msg)}</span>`;
+          }
+          existing.querySelector('.col-error').innerHTML = errorHtml;
+
+          let actions = '';
+          if (article.link) actions += `<a class="btn btn-link" href="${escAttr(article.link)}" target="_blank" rel="noopener">↗ Article</a> `;
+          if (article.status === 'failed') actions += `<button class="btn btn-retry" data-action="retry" data-guid="${escAttr(article.guid)}">Retry</button> `;
+          if (article.status === 'done') actions += `<button class="btn btn-purge" data-action="purge" data-guid="${escAttr(article.guid)}">Purge</button> `;
+          if (article.status === 'done' && article.audio_file) actions += `<a class="btn btn-audio" href="${BASE_URL}/audio/${encodeURIComponent(article.audio_file)}">▶ Audio</a> `;
+          actions += `<button class="btn btn-delete" data-action="delete" data-guid="${escAttr(article.guid)}">Delete</button>`;
+          existing.querySelector('.col-actions').innerHTML = actions;
+          changed = true;
+        } else {
+          const temp = document.createElement('tbody');
+          temp.innerHTML = buildRow(article);
+          const newTr = temp.firstElementChild;
+          const allRows = [...tbody.querySelectorAll('tr[data-guid]')];
+          const newDate = article.pub_date || article.created_at || '';
+          const insertBefore = allRows.find(row => {
+            const rowArt = apiMap.get(row.dataset.guid);
+            const rowDate = rowArt ? (rowArt.pub_date || rowArt.created_at || '') : '';
+            return newDate > rowDate;
+          }) ?? null;
+          tbody.insertBefore(newTr, insertBefore);
+          changed = true;
+        }
+      }
+
+      for (const [, tr] of domRows) {
+        if (!tr.querySelector('[data-action]:disabled')) { tr.remove(); changed = true; }
+      }
+
+      if (tbody.querySelectorAll('tr[data-guid]').length === 0 && !tbody.querySelector('.empty')) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>';
+      }
+
+      if (changed) { recalcCounts(); applyFilter(); }
+      window.scrollTo(0, savedY);
     }
 
     // Filter tabs
@@ -228,10 +364,7 @@
       tab.addEventListener('click', () => {
         tabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        const filter = tab.dataset.filter;
-        document.querySelectorAll('#articles-body tr[data-status]').forEach(row => {
-          row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
-        });
+        applyFilter();
       });
     });
 
@@ -290,6 +423,13 @@
         btn.disabled = false;
       }
     });
+
+    setInterval(async () => {
+      try {
+        const res = await fetch('/api/articles');
+        if (res.ok) reconcile(await res.json());
+      } catch { /* silent */ }
+    }, 5000);
   </script>
 </body>
 </html>
