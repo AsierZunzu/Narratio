@@ -165,6 +165,7 @@ docker compose run --rm narratio node dist/worker/index.js --retry-failed
 |---|---|
 | `--force-reset` | Deletes all audio files and reinitialises the database. **Required when changing `RSS_URL`.** |
 | `--retry-failed` | Resets retry counters for all failed articles, then runs immediately |
+| `--regen-audio` | Deletes all `.wav` files from `data/audio/` and resets every article (any status) to `pending` with zero retries, then exits. Useful when you want to regenerate audio with a different TTS model/voice without losing article history. |
 
 ---
 
