@@ -1,26 +1,14 @@
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import * as schema from './schema.js';
 
-export type ArticleStatus = 'pending' | 'converting' | 'done' | 'failed' | 'purged';
+export type { Article, ArticleStatus } from './schema.js';
+export type Db = BetterSQLite3Database<typeof schema>;
 
-export interface Article {
-  guid: string;
-  feed_url: string;
-  title: string;
-  link: string | null;
-  pub_date: string | null;
-  content: string | null;
-  image_url: string | null;
-  audio_file: string | null;
-  status: ArticleStatus;
-  tts_retries: number;
-  tts_elapsed_ms: number | null;
-  error: string | null;
-  created_at: string;
-}
-
-const SCHEMA = `
+const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   guid            TEXT PRIMARY KEY,
   feed_url        TEXT NOT NULL,
@@ -38,31 +26,35 @@ CREATE TABLE IF NOT EXISTS articles (
 );
 `;
 
-let _db: Database.Database | null = null;
+let _sqlite: Database.Database | null = null;
+let _db: Db | null = null;
 
-export function getDb(dbPath?: string): Database.Database {
+export function getDb(dbPath?: string): Db {
   if (_db) return _db;
 
   const resolvedPath = dbPath ?? path.join(process.cwd(), 'data', 'narratio.db');
   const dir = path.dirname(resolvedPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  _db = new Database(resolvedPath);
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('foreign_keys = ON');
-  _db.exec(SCHEMA);
+  _sqlite = new Database(resolvedPath);
+  _sqlite.pragma('journal_mode = WAL');
+  _sqlite.pragma('foreign_keys = ON');
+  _sqlite.exec(SCHEMA_SQL);
   // Migration: add tts_elapsed_ms to existing databases that predate this column.
   try {
-    _db.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER');
+    _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER');
   } catch {
     // Column already exists — nothing to do.
   }
+
+  _db = drizzle(_sqlite, { schema });
   return _db;
 }
 
 export function closeDb(): void {
-  if (_db) {
-    _db.close();
+  if (_sqlite) {
+    _sqlite.close();
+    _sqlite = null;
     _db = null;
   }
 }

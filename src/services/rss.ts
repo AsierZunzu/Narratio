@@ -1,5 +1,5 @@
 import Parser from 'rss-parser';
-import type { Database } from 'better-sqlite3';
+import type { Db } from '../db/index.js';
 import path from 'path';
 import { extract } from '@extractus/article-extractor';
 import { htmlToText } from '../utils/html.js';
@@ -8,6 +8,7 @@ import {
   insertArticle,
   getPendingArticles,
   getRetryableArticles,
+  getArticleByGuid,
   markArticleConverting,
   markArticleDone,
   markArticleFailed,
@@ -92,7 +93,7 @@ export interface RssServiceOptions {
   audioDir: string;
 }
 
-export async function processFeed(db: Database, opts: RssServiceOptions): Promise<void> {
+export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void> {
   logger.info(`Fetching RSS feed: ${opts.feedUrl}`);
 
   let feed: Awaited<ReturnType<typeof parser.parseURL>>;
@@ -179,7 +180,7 @@ function sanitiseText(raw: string): string {
 }
 
 async function dispatchTts(
-  db: Database,
+  db: Db,
   guid: string,
   title: string,
   content: string | null,
@@ -217,10 +218,7 @@ async function dispatchTts(
     logger.error(`TTS failed for "${title}" (text length: ${text.length} chars, file: ${filename}): ${msg}`);
 
     // Check if permanently failed after this increment
-    const article = db
-      .prepare('SELECT tts_retries FROM articles WHERE guid = ?')
-      .get(guid) as { tts_retries: number } | undefined;
-
+    const article = getArticleByGuid(db, guid);
     const retriesAfter = (article?.tts_retries ?? 0) + 1;
 
     if (opts.maxRetries > 0 && retriesAfter >= opts.maxRetries) {

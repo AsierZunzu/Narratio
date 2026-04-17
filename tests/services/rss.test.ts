@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../src/db/schema.js';
 import net from 'net';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { processFeed } from '../../src/services/rss.js';
 import { getArticleByGuid, getPublishedArticles } from '../../src/db/articles.js';
+import type { Db } from '../../src/db/index.js';
 
-const SCHEMA = `
+const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   guid TEXT PRIMARY KEY,
   feed_url TEXT NOT NULL,
@@ -25,10 +28,10 @@ CREATE TABLE IF NOT EXISTS articles (
 );
 `;
 
-function makeDb() {
-  const db = new Database(':memory:');
-  db.exec(SCHEMA);
-  return db;
+function makeDb(): Db {
+  const sqlite = new Database(':memory:');
+  sqlite.exec(SCHEMA_SQL);
+  return drizzle(sqlite, { schema });
 }
 
 function makeTempDir() {
@@ -79,7 +82,7 @@ function setFeedItems(items: Array<Record<string, unknown>>) {
 }
 
 describe('processFeed', () => {
-  let db: Database.Database;
+  let db: Db;
   let tmpDir: string;
 
   const baseOpts = () => ({

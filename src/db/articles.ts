@@ -1,5 +1,8 @@
-import type { Database } from 'better-sqlite3';
-import type { Article, ArticleStatus } from './index.js';
+import { eq, lt, inArray, and, asc, desc, sql, count } from 'drizzle-orm';
+import type { Db, ArticleStatus } from './index.js';
+import { articles } from './schema.js';
+
+export type { Article, ArticleStatus } from './index.js';
 
 export interface InsertArticleParams {
   guid: string;
@@ -11,114 +14,109 @@ export interface InsertArticleParams {
   image_url: string | null;
 }
 
-export function insertArticle(db: Database, params: InsertArticleParams): boolean {
-  const stmt = db.prepare(`
-    INSERT OR IGNORE INTO articles (guid, feed_url, title, link, pub_date, content, image_url)
-    VALUES (@guid, @feed_url, @title, @link, @pub_date, @content, @image_url)
-  `);
-  const result = stmt.run(params);
+export function insertArticle(db: Db, params: InsertArticleParams): boolean {
+  const result = db.insert(articles).values(params).onConflictDoNothing().run();
   return result.changes > 0;
 }
 
-export function getArticleByGuid(db: Database, guid: string): Article | undefined {
-  return db.prepare('SELECT * FROM articles WHERE guid = ?').get(guid) as Article | undefined;
+export function getArticleByGuid(db: Db, guid: string) {
+  return db.select().from(articles).where(eq(articles.guid, guid)).get();
 }
 
-export function markArticleConverting(db: Database, guid: string): void {
-  db.prepare(`UPDATE articles SET status = 'converting' WHERE guid = ?`).run(guid);
+export function markArticleConverting(db: Db, guid: string): void {
+  db.update(articles).set({ status: 'converting' }).where(eq(articles.guid, guid)).run();
 }
 
-export function resetConvertingArticles(db: Database): number {
-  const result = db.prepare(`UPDATE articles SET status = 'pending' WHERE status = 'converting'`).run();
+export function resetConvertingArticles(db: Db): number {
+  const result = db.update(articles).set({ status: 'pending' }).where(eq(articles.status, 'converting')).run();
   return result.changes;
 }
 
-export function markArticleDone(db: Database, guid: string, audioFile: string, elapsedMs: number): void {
-  db.prepare(`
-    UPDATE articles SET status = 'done', audio_file = ?, tts_elapsed_ms = ?, error = NULL WHERE guid = ?
-  `).run(audioFile, elapsedMs, guid);
+export function markArticleDone(db: Db, guid: string, audioFile: string, elapsedMs: number): void {
+  db.update(articles)
+    .set({ status: 'done', audio_file: audioFile, tts_elapsed_ms: elapsedMs, error: null })
+    .where(eq(articles.guid, guid))
+    .run();
 }
 
-export function markArticleFailed(db: Database, guid: string, error: string): void {
-  db.prepare(`
-    UPDATE articles
-    SET status = 'failed', tts_retries = tts_retries + 1, error = ?
-    WHERE guid = ?
-  `).run(error, guid);
+export function markArticleFailed(db: Db, guid: string, error: string): void {
+  db.update(articles)
+    .set({ status: 'failed', tts_retries: sql`${articles.tts_retries} + 1`, error })
+    .where(eq(articles.guid, guid))
+    .run();
 }
 
-export function markArticlePermanentlyFailed(db: Database, guid: string, error: string): void {
-  db.prepare(`
-    UPDATE articles SET status = 'failed', tts_retries = tts_retries + 1, error = ? WHERE guid = ?
-  `).run(error, guid);
+export function markArticlePermanentlyFailed(db: Db, guid: string, error: string): void {
+  db.update(articles)
+    .set({ status: 'failed', tts_retries: sql`${articles.tts_retries} + 1`, error })
+    .where(eq(articles.guid, guid))
+    .run();
 }
 
-export function markArticlePurged(db: Database, guid: string): void {
-  db.prepare(`
-    UPDATE articles SET status = 'purged', audio_file = NULL WHERE guid = ?
-  `).run(guid);
+export function markArticlePurged(db: Db, guid: string): void {
+  db.update(articles)
+    .set({ status: 'purged', audio_file: null })
+    .where(eq(articles.guid, guid))
+    .run();
 }
 
-export function resetFailedRetries(db: Database): number {
-  const result = db.prepare(`
-    UPDATE articles SET tts_retries = 0, status = 'pending' WHERE status = 'failed'
-  `).run();
+export function resetFailedRetries(db: Db): number {
+  const result = db.update(articles)
+    .set({ tts_retries: 0, status: 'pending' })
+    .where(eq(articles.status, 'failed'))
+    .run();
   return result.changes;
 }
 
-export function getPendingArticles(db: Database): Article[] {
-  return db.prepare(`
-    SELECT * FROM articles WHERE status = 'pending' ORDER BY created_at ASC
-  `).all() as Article[];
+export function getPendingArticles(db: Db) {
+  return db.select().from(articles).where(eq(articles.status, 'pending')).orderBy(asc(articles.created_at)).all();
 }
 
-export function getRetryableArticles(db: Database, maxRetries: number): Article[] {
-  return db.prepare(`
-    SELECT * FROM articles
-    WHERE status = 'failed' AND tts_retries < ?
-    ORDER BY created_at ASC
-  `).all(maxRetries) as Article[];
+export function getRetryableArticles(db: Db, maxRetries: number) {
+  return db.select().from(articles)
+    .where(and(eq(articles.status, 'failed'), lt(articles.tts_retries, maxRetries)))
+    .orderBy(asc(articles.created_at))
+    .all();
 }
 
-export function getPublishedArticles(db: Database): Article[] {
-  return db.prepare(`
-    SELECT * FROM articles
-    WHERE status IN ('done', 'purged', 'failed')
-    ORDER BY pub_date DESC, created_at DESC
-  `).all() as Article[];
+export function getPublishedArticles(db: Db) {
+  return db.select().from(articles)
+    .where(inArray(articles.status, ['done', 'purged', 'failed']))
+    .orderBy(desc(articles.pub_date), desc(articles.created_at))
+    .all();
 }
 
-export function getDoneArticlesOrderedByDate(db: Database): Article[] {
-  return db.prepare(`
-    SELECT * FROM articles
-    WHERE status = 'done'
-    ORDER BY pub_date ASC, created_at ASC
-  `).all() as Article[];
+export function getDoneArticlesOrderedByDate(db: Db) {
+  return db.select().from(articles)
+    .where(eq(articles.status, 'done'))
+    .orderBy(asc(articles.pub_date), asc(articles.created_at))
+    .all();
 }
 
-export function countDoneArticles(db: Database): number {
-  const row = db.prepare(`SELECT COUNT(*) as count FROM articles WHERE status = 'done'`).get() as { count: number };
-  return row.count;
+export function countDoneArticles(db: Db): number {
+  const result = db.select({ count: count() }).from(articles).where(eq(articles.status, 'done')).get();
+  return result?.count ?? 0;
 }
 
-export function updateArticleStatus(db: Database, guid: string, status: ArticleStatus): void {
-  db.prepare('UPDATE articles SET status = ? WHERE guid = ?').run(status, guid);
+export function updateArticleStatus(db: Db, guid: string, status: ArticleStatus): void {
+  db.update(articles).set({ status }).where(eq(articles.guid, guid)).run();
 }
 
-export function getAllArticles(db: Database): Article[] {
-  return db.prepare(`
-    SELECT * FROM articles ORDER BY pub_date DESC, created_at DESC
-  `).all() as Article[];
+export function getAllArticles(db: Db) {
+  return db.select().from(articles)
+    .orderBy(desc(articles.pub_date), desc(articles.created_at))
+    .all();
 }
 
-export function deleteArticle(db: Database, guid: string): boolean {
-  const result = db.prepare('DELETE FROM articles WHERE guid = ?').run(guid);
+export function deleteArticle(db: Db, guid: string): boolean {
+  const result = db.delete(articles).where(eq(articles.guid, guid)).run();
   return result.changes > 0;
 }
 
-export function resetArticleRetries(db: Database, guid: string): boolean {
-  const result = db.prepare(`
-    UPDATE articles SET tts_retries = 0, status = 'pending', error = NULL WHERE guid = ? AND status = 'failed'
-  `).run(guid);
+export function resetArticleRetries(db: Db, guid: string): boolean {
+  const result = db.update(articles)
+    .set({ tts_retries: 0, status: 'pending', error: null })
+    .where(and(eq(articles.guid, guid), eq(articles.status, 'failed')))
+    .run();
   return result.changes > 0;
 }

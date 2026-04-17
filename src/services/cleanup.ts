@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { Database } from 'better-sqlite3';
+import type { Db } from '../db/index.js';
 import { getDoneArticlesOrderedByDate, markArticlePurged } from '../db/articles.js';
 import { logger } from '../utils/logger.js';
 
@@ -17,7 +17,7 @@ export interface CleanupOptions {
  * until both quotas are satisfied. Deleted articles are marked as 'purged'
  * in the DB so they remain visible in the podcast feed with fallback audio.
  */
-export function runCleanup(db: Database, opts: CleanupOptions): void {
+export function runCleanup(db: Db, opts: CleanupOptions): void {
   const { maxAudioFiles, maxAudioSizeMb, audioDir } = opts;
   if (maxAudioFiles === Infinity && maxAudioSizeMb === Infinity) return;
 

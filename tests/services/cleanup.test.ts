@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../src/db/schema.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { runCleanup } from '../../src/services/cleanup.js';
 import { insertArticle, markArticleDone, getArticleByGuid } from '../../src/db/articles.js';
+import type { Db } from '../../src/db/index.js';
 
-const SCHEMA = `
+const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   guid TEXT PRIMARY KEY,
   feed_url TEXT NOT NULL,
@@ -24,17 +27,17 @@ CREATE TABLE IF NOT EXISTS articles (
 );
 `;
 
-function makeDb() {
-  const db = new Database(':memory:');
-  db.exec(SCHEMA);
-  return db;
+function makeDb(): Db {
+  const sqlite = new Database(':memory:');
+  sqlite.exec(SCHEMA_SQL);
+  return drizzle(sqlite, { schema });
 }
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-cleanup-'));
 }
 
-function addDoneArticle(db: Database.Database, audioDir: string, guid: string, sizeBytes: number, pubDate: string) {
+function addDoneArticle(db: Db, audioDir: string, guid: string, sizeBytes: number, pubDate: string) {
   insertArticle(db, {
     guid,
     feed_url: 'https://example.com/feed',
@@ -51,7 +54,7 @@ function addDoneArticle(db: Database.Database, audioDir: string, guid: string, s
 }
 
 describe('runCleanup', () => {
-  let db: Database.Database;
+  let db: Db;
   let audioDir: string;
 
   beforeEach(() => {

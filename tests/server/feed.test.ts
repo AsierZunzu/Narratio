@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../src/db/schema.js';
 import { buildFeedXml } from '../../src/server/feed.js';
-import { insertArticle, markArticleDone, markArticlePurged, markArticleFailed } from '../../src/db/articles.js';
+import { insertArticle, markArticleDone, markArticlePurged, markArticleFailed, updateArticleStatus } from '../../src/db/articles.js';
+import type { Db } from '../../src/db/index.js';
 
-const SCHEMA = `
+const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   guid TEXT PRIMARY KEY,
   feed_url TEXT NOT NULL,
@@ -21,17 +24,17 @@ CREATE TABLE IF NOT EXISTS articles (
 );
 `;
 
-function makeDb() {
-  const db = new Database(':memory:');
-  db.exec(SCHEMA);
-  return db;
+function makeDb(): Db {
+  const sqlite = new Database(':memory:');
+  sqlite.exec(SCHEMA_SQL);
+  return drizzle(sqlite, { schema });
 }
 
 const BASE_URL = 'http://localhost:3000';
 const CONFIG = { baseUrl: BASE_URL };
 
 describe('buildFeedXml', () => {
-  let db: Database.Database;
+  let db: Db;
 
   beforeEach(() => {
     db = makeDb();
@@ -78,8 +81,8 @@ describe('buildFeedXml', () => {
   it('prefixes TTS-failed articles with [TTS FAILED]', () => {
     insertArticle(db, { guid: 'g3', feed_url: 'https://example.com/feed', title: 'Broken', link: null, pub_date: null, content: null, image_url: null });
     markArticleFailed(db, 'g3', 'tts error');
-    // Force status to failed without audio (simulate permanently failed)
-    db.prepare("UPDATE articles SET status = 'failed' WHERE guid = 'g3'").run();
+    // Ensure status is 'failed' (already set by markArticleFailed, but explicit for clarity)
+    updateArticleStatus(db, 'g3', 'failed');
 
     const xml = buildFeedXml(db, CONFIG);
     expect(xml).toContain('[TTS FAILED] Broken');
