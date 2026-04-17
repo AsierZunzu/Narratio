@@ -65,7 +65,7 @@ export async function synthesise(
     const timeout = setTimeout(() => {
       timedOut = true;
       socket.destroy();
-      const msg = `TTS timeout after ${opts.timeoutMs}ms waiting for ${opts.host}:${opts.port}`;
+      const msg = `TTS timeout after ${opts.timeoutMs}ms waiting`;
       logger.error(msg);
       reject(new Error(msg));
     }, opts.timeoutMs);
@@ -190,7 +190,7 @@ export async function synthesise(
           settle();
           return;
         } else if (type === 'error') {
-          const msg = `Wyoming TTS error from ${opts.host}:${opts.port}: ${JSON.stringify(dataInline)}`;
+          const msg = `Wyoming TTS error: ${JSON.stringify(dataInline)}`;
           logger.error(msg);
           settle(new Error(msg));
           return;
@@ -209,7 +209,7 @@ export async function synthesise(
     socket.setNoDelay(true);
     socket.connect(opts.port, opts.host, () => {
       logger.info(
-        `TTS sending ${text.length} chars to ${opts.host}:${opts.port} — preview: "${text.slice(0, 120).replace(/\n/g, ' ')}${text.length > 120 ? '…' : ''}"`,
+        `TTS sending ${text.length} chars — preview: "${text.slice(0, 120).replace(/\n/g, ' ')}${text.length > 120 ? '…' : ''}"`,
       );
       const request = JSON.stringify({ type: 'synthesize', data: { text } }) + '\n';
       socket.write(request);
@@ -217,7 +217,7 @@ export async function synthesise(
 
     socket.on('data', (chunk: Buffer) => {
       if (settled || timedOut) return;
-      logger.debug(`TTS received ${chunk.length} bytes from ${opts.host}:${opts.port}`);
+      logger.debug(`TTS received ${chunk.length} bytes`);
       recvBuf = Buffer.concat([recvBuf, chunk]);
       drain();
     });
@@ -237,7 +237,7 @@ export async function synthesise(
     socket.on('error', (err) => {
       if (timedOut || settled) return;
       clearTimeout(timeout);
-      const msg = `TTS connection error for ${opts.host}:${opts.port} — ${err.message}`;
+      const msg = `TTS connection error — ${err.message}`;
       logger.error(msg);
       reject(new Error(msg));
     });
