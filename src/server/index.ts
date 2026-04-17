@@ -5,7 +5,7 @@ import fs from 'fs';
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
-import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged } from '../db/articles.js';
+import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid } from '../db/articles.js';
 import { synthesise } from '../services/tts.js';
 import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
@@ -97,9 +97,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
 
   app.delete('/api/articles/:guid', (req, res) => {
     const { guid } = req.params;
-    const article = db.prepare('SELECT audio_file FROM articles WHERE guid = ?').get(guid) as
-      | { audio_file: string | null }
-      | undefined;
+    const article = getArticleByGuid(db, guid);
 
     if (!article) {
       res.status(404).send('Article not found');
@@ -127,9 +125,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
 
   app.post('/api/articles/:guid/purge', (req, res) => {
     const { guid } = req.params;
-    const article = db.prepare('SELECT audio_file, status FROM articles WHERE guid = ?').get(guid) as
-      | { audio_file: string | null; status: string }
-      | undefined;
+    const article = getArticleByGuid(db, guid);
 
     if (!article || article.status !== 'done') {
       res.status(404).send('Article not found or not in done state');

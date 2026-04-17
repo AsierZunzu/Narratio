@@ -1,5 +1,5 @@
 import { Podcast } from 'podcast';
-import type { Database } from 'better-sqlite3';
+import type { Db } from '../db/index.js';
 import { getPublishedArticles } from '../db/articles.js';
 import { env } from '../utils/env.js';
 
@@ -10,7 +10,7 @@ export interface FeedConfig {
 const PURGED_PREFIX = '[PURGED]';
 const TTS_FAILED_PREFIX = '[TTS FAILED]';
 
-export function buildFeedXml(db: Database, config: FeedConfig): string {
+export function buildFeedXml(db: Db, config: FeedConfig): string {
   const title = env.PODCAST_TITLE();
   const description = env.PODCAST_DESCRIPTION() || `Narratio: ${title}`;
   const author = env.PODCAST_AUTHOR();

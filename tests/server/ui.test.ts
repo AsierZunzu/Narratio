@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../src/db/schema.js';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { createApp } from '../../src/server/index.js';
 import { insertArticle, markArticleDone, markArticleFailed } from '../../src/db/articles.js';
 import { getDb, resetDb } from '../../src/db/index.js';
+import type { Db } from '../../src/db/index.js';
 
-const SCHEMA = `
+const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   guid TEXT PRIMARY KEY,
   feed_url TEXT NOT NULL,
@@ -26,11 +29,12 @@ CREATE TABLE IF NOT EXISTS articles (
 );
 `;
 
-function makeTempDb(): { db: Database.Database; dbPath: string } {
+function makeTempDb(): { db: Db; dbPath: string } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-ui-'));
   const dbPath = path.join(dir, 'test.db');
-  const db = new Database(dbPath);
-  db.exec(SCHEMA);
+  const sqlite = new Database(dbPath);
+  sqlite.exec(SCHEMA_SQL);
+  const db = drizzle(sqlite, { schema });
   return { db, dbPath };
 }
 
@@ -74,7 +78,7 @@ describe('GET /api/articles', () => {
     const { db, dbPath } = makeTempDb();
     insertArticle(db, { guid: 'g1', feed_url: 'https://x.com/feed', title: 'Article 1', link: null, pub_date: null, content: null, image_url: null });
     insertArticle(db, { guid: 'g2', feed_url: 'https://x.com/feed', title: 'Article 2', link: null, pub_date: null, content: null, image_url: null });
-    db.close();
+    db.$client.close();
 
     const app = createApp(dbPath);
     const res = await request(app).get('/api/articles');
@@ -89,7 +93,7 @@ describe('DELETE /api/articles/:guid', () => {
     resetDb();
     const { db, dbPath } = makeTempDb();
     insertArticle(db, { guid: 'del1', feed_url: 'https://x.com/feed', title: 'To Delete', link: null, pub_date: null, content: null, image_url: null });
-    db.close();
+    db.$client.close();
 
     const app = createApp(dbPath);
     const res = await request(app).delete('/api/articles/del1');
@@ -115,7 +119,7 @@ describe('POST /api/articles/:guid/retry', () => {
     const { db, dbPath } = makeTempDb();
     insertArticle(db, { guid: 'ret1', feed_url: 'https://x.com/feed', title: 'Retry Me', link: null, pub_date: null, content: null, image_url: null });
     markArticleFailed(db, 'ret1', 'some error');
-    db.close();
+    db.$client.close();
 
     const app = createApp(dbPath);
     const res = await request(app).post('/api/articles/ret1/retry');
@@ -131,7 +135,7 @@ describe('POST /api/articles/:guid/retry', () => {
     resetDb();
     const { db, dbPath } = makeTempDb();
     insertArticle(db, { guid: 'ret2', feed_url: 'https://x.com/feed', title: 'Pending', link: null, pub_date: null, content: null, image_url: null });
-    db.close();
+    db.$client.close();
 
     const app = createApp(dbPath);
     const res = await request(app).post('/api/articles/ret2/retry');
@@ -154,7 +158,7 @@ describe('POST /api/articles/:guid/purge', () => {
     insertArticle(db, { guid: 'pur1', feed_url: 'https://x.com/feed', title: 'Purge Me', link: null, pub_date: null, content: null, image_url: null });
     // Mark done with a non-existent audio file — the unlink will silently fail
     markArticleDone(db, 'pur1', 'pur1.wav', 0);
-    db.close();
+    db.$client.close();
 
     const app = createApp(dbPath);
     const res = await request(app).post('/api/articles/pur1/purge');
@@ -169,7 +173,7 @@ describe('POST /api/articles/:guid/purge', () => {
     resetDb();
     const { db, dbPath } = makeTempDb();
     insertArticle(db, { guid: 'pur2', feed_url: 'https://x.com/feed', title: 'Pending', link: null, pub_date: null, content: null, image_url: null });
-    db.close();
+    db.$client.close();
 
     const app = createApp(dbPath);
     const res = await request(app).post('/api/articles/pur2/purge');

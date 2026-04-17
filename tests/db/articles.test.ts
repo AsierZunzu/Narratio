@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../src/db/schema.js';
 import {
   insertArticle,
   getArticleByGuid,
@@ -12,7 +14,7 @@ import {
   getPublishedArticles,
 } from '../../src/db/articles.js';
 
-const SCHEMA = `
+const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS articles (
   guid         TEXT PRIMARY KEY,
   feed_url     TEXT NOT NULL,
@@ -31,9 +33,9 @@ CREATE TABLE IF NOT EXISTS articles (
 `;
 
 function makeDb() {
-  const db = new Database(':memory:');
-  db.exec(SCHEMA);
-  return db;
+  const sqlite = new Database(':memory:');
+  sqlite.exec(SCHEMA_SQL);
+  return drizzle(sqlite, { schema });
 }
 
 const BASE_ARTICLE = {
