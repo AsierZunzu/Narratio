@@ -19,30 +19,20 @@ interface AudioInfo {
 /**
  * Synthesises text via a Piper Wyoming TTS server (TCP).
  *
- * Wyoming protocol (proper framing):
+ * Wyoming protocol:
  *   1. Connect to TCP socket.
  *   2. Send: {"type":"synthesize","data":{"text":"..."}}\n
- *   3. Receive a stream of framed events:
- *        {"type":"audio-start","data":{"rate":N,"width":N,"channels":N},"payload_length":0}\n
- *        {"type":"audio-chunk","data":{...},"payload_length":N}\n  +  N raw PCM bytes
- *        {"type":"audio-stop","data":{},"payload_length":0}\n
- *   4. On audio-stop: assemble a WAV file (header + PCM) and write it.
- *
- * Raw-audio fallback:
- *   Some wyoming-piper builds stream raw audio bytes after the JSON event
- *   headers instead of using proper audio-chunk framing.  When non-JSON data
- *   is detected the parser switches to raw-collection mode: all subsequent
- *   bytes are accumulated as audio.  If the accumulated data already starts
- *   with a RIFF header it is written as-is; otherwise it is wrapped in a WAV
- *   header using the format info from audio-start (or sane defaults).
- *   Because the server keeps the connection open, settlement is triggered by
- *   a short idle timer (RAW_AUDIO_IDLE_MS) after the last byte arrives.
+ *   3. Receive a stream of framed events.  Each event is three contiguous sections:
+ *        a) JSON header line (\n-terminated):
+ *             {"type":"audio-start","data_length":N,"payload_length":0}
+ *             {"type":"audio-chunk","data_length":N,"payload_length":M}
+ *             {"type":"audio-stop","data_length":0,"payload_length":0}
+ *        b) data section: data_length bytes of UTF-8 JSON (audio format: rate/width/channels)
+ *        c) payload section: payload_length bytes of raw binary PCM
+ *   4. On audio-stop (or connection close): assemble a WAV file and write it.
  *
  * Returns the absolute path of the written WAV file.
  */
-
-/** Milliseconds of silence after which raw-audio mode auto-settles. */
-const RAW_AUDIO_IDLE_MS = 1_000;
 
 export async function synthesise(
   text: string,
@@ -58,12 +48,16 @@ export async function synthesise(
 
     // Incoming binary buffer — never stringify this before consuming payload bytes.
     let recvBuf = Buffer.alloc(0);
-    // Bytes of binary payload still to consume for the current event.
-    let pendingPayload = 0;
-
-    // Raw-audio fallback mode: set to true when non-JSON data is detected.
-    let rawAudioMode = false;
-    let rawAudioIdleTimer: ReturnType<typeof setTimeout> | null = null;
+    // Wyoming frames each event as three contiguous sections:
+    //   1. JSON header line (ends with \n): {"type":"...","data_length":N,"payload_length":M}
+    //   2. Data section: N bytes of UTF-8 JSON (contains audio format metadata)
+    //   3. Payload section: M bytes of raw binary PCM
+    // The two counters below track how many bytes remain in each section.
+    let pendingDataLength = 0;    // bytes of UTF-8 JSON data section still to consume
+    let pendingPayloadLength = 0; // bytes of raw binary payload still to consume
+    let pendingEventType: string | null = null;
+    // Accumulates bytes for the data section until fully received, then parsed.
+    let pendingDataBuf = Buffer.alloc(0);
 
     let audioInfo: AudioInfo = { rate: 22050, width: 2, channels: 1 };
     const audioChunks: Buffer[] = [];
@@ -80,7 +74,6 @@ export async function synthesise(
       if (settled || timedOut) return;
       settled = true;
       clearTimeout(timeout);
-      if (rawAudioIdleTimer) clearTimeout(rawAudioIdleTimer);
       socket.destroy();
 
       if (err) return reject(err);
@@ -95,8 +88,8 @@ export async function synthesise(
       }
 
       const allAudio = Buffer.concat(audioChunks);
-      // If the collected bytes already carry a RIFF/WAV header (raw-audio mode),
-      // write them as-is.  Otherwise wrap the raw PCM in a synthesised WAV header.
+      // If the collected bytes already carry a RIFF/WAV header, write as-is;
+      // otherwise wrap the raw PCM in a synthesised WAV header.
       const wavData = allAudio.subarray(0, 4).toString('ascii') === 'RIFF'
         ? allAudio
         : buildWavFile(audioChunks, audioInfo);
@@ -104,42 +97,62 @@ export async function synthesise(
       try {
         fs.mkdirSync(path.dirname(outPath), { recursive: true });
         fs.writeFileSync(outPath, wavData);
-        logger.info(`TTS audio written: ${outPath} (${wavData.length} bytes)`);
+        const pcmBytes = wavData.length - 44;
+        const durationSec = pcmBytes / (audioInfo.rate * audioInfo.channels * audioInfo.width);
+        logger.info(`TTS audio written: ${outPath} (${wavData.length} bytes, ${durationSec.toFixed(2)}s @ ${audioInfo.rate}Hz/${audioInfo.width * 8}bit/${audioInfo.channels}ch)`);
         resolve(outPath);
       } catch (writeErr) {
         reject(writeErr);
       }
     };
 
-    /** Restart the idle-settle timer for raw-audio mode. */
-    const scheduleRawAudioSettle = () => {
-      if (rawAudioIdleTimer) clearTimeout(rawAudioIdleTimer);
-      rawAudioIdleTimer = setTimeout(() => {
-        if (!settled && !timedOut) {
-          const total = audioChunks.reduce((s, c) => s + c.length, 0);
-          logger.debug(`TTS: raw-audio idle timeout — settling with ${total} bytes`);
-          settle();
-        }
-      }, RAW_AUDIO_IDLE_MS);
-    };
-
     // Drain recvBuf according to the Wyoming framing state machine.
+    //
+    // Each event arrives as three contiguous sections:
+    //   1. JSON header line (\n-terminated): carries type, data_length, payload_length.
+    //   2. Data section (data_length bytes): UTF-8 JSON with audio format metadata.
+    //   3. Payload section (payload_length bytes): raw binary PCM audio.
+    //
+    // The loop handles one section at a time in strict order so that the JSON data
+    // section bytes are never mistaken for audio, which would produce clicks/noise.
     function drain() {
       while (recvBuf.length > 0 && !settled && !timedOut) {
-        if (pendingPayload > 0) {
-          // Consume binary payload bytes for the current audio-chunk event.
-          const consume = Math.min(pendingPayload, recvBuf.length);
-          audioChunks.push(recvBuf.subarray(0, consume));
+        // Phase 1: consume the data section (UTF-8 JSON metadata).
+        if (pendingDataLength > 0) {
+          const consume = Math.min(pendingDataLength, recvBuf.length);
+          pendingDataBuf = Buffer.concat([pendingDataBuf, recvBuf.subarray(0, consume)]);
           recvBuf = recvBuf.subarray(consume);
-          pendingPayload -= consume;
+          pendingDataLength -= consume;
+
+          if (pendingDataLength === 0) {
+            // Fully received — parse format info (present on audio-start and audio-chunk).
+            try {
+              const fmt = JSON.parse(pendingDataBuf.toString('utf8')) as Record<string, unknown>;
+              if (typeof fmt['rate'] === 'number') audioInfo.rate = fmt['rate'] as number;
+              if (typeof fmt['width'] === 'number') audioInfo.width = fmt['width'] as number;
+              if (typeof fmt['channels'] === 'number') audioInfo.channels = fmt['channels'] as number;
+              logger.debug(`TTS ${pendingEventType} data section: rate=${audioInfo.rate} width=${audioInfo.width} channels=${audioInfo.channels}`);
+            } catch {
+              logger.warn(`TTS: failed to parse data section for ${pendingEventType}, using defaults`);
+            }
+            pendingDataBuf = Buffer.alloc(0);
+          }
           continue;
         }
 
-        // Look for a complete JSON event line.
+        // Phase 2: consume the payload section (raw binary PCM).
+        if (pendingPayloadLength > 0) {
+          const consume = Math.min(pendingPayloadLength, recvBuf.length);
+          audioChunks.push(recvBuf.subarray(0, consume));
+          recvBuf = recvBuf.subarray(consume);
+          pendingPayloadLength -= consume;
+          continue;
+        }
+
+        // Both sections fully consumed — look for the next JSON header line.
         const nlIdx = recvBuf.indexOf(0x0a /* '\n' */);
         if (nlIdx === -1) break; // wait for more data
 
-        // Keep original bytes so we can reconstruct them if JSON parsing fails.
         const lineBytes = recvBuf.subarray(0, nlIdx);
         const line = lineBytes.toString('utf8').trim();
         recvBuf = recvBuf.subarray(nlIdx + 1);
@@ -149,41 +162,35 @@ export async function synthesise(
         try {
           event = JSON.parse(line) as Record<string, unknown>;
         } catch {
-          // Non-JSON data means the server is streaming raw audio bytes.
-          // Reconstruct the bytes we just consumed (line + newline) and switch
-          // to raw-collection mode for all remaining data.
-          if (!rawAudioMode) {
-            logger.warn(
-              `TTS: non-JSON data from ${opts.host}:${opts.port} — switching to raw-audio fallback`,
-            );
-            rawAudioMode = true;
-          }
-          audioChunks.push(Buffer.concat([lineBytes, Buffer.from([0x0a]), recvBuf]));
-          recvBuf = Buffer.alloc(0);
-          scheduleRawAudioSettle();
-          break;
+          // Non-JSON bytes (raw PCM containing 0x0a) — treat as audio and keep going
+          // so we can still detect audio-stop later.
+          audioChunks.push(lineBytes);
+          audioChunks.push(Buffer.from([0x0a]));
+          continue;
         }
 
         const type = event['type'] as string | undefined;
-        const data = event['data'] as Record<string, unknown> | undefined;
-        const payloadLen =
-          typeof event['payload_length'] === 'number' ? (event['payload_length'] as number) : 0;
+        const dataInline = event['data'] as Record<string, unknown> | undefined;
+        const dataLen = typeof event['data_length'] === 'number' ? (event['data_length'] as number) : 0;
+        const payloadLen = typeof event['payload_length'] === 'number' ? (event['payload_length'] as number) : 0;
 
-        logger.debug(`TTS event: type=${type} payload_length=${payloadLen}`);
+        logger.debug(`TTS event: type=${type} data_length=${dataLen} payload_length=${payloadLen}`);
 
-        if (type === 'audio-start' && data) {
-          audioInfo = {
-            rate: typeof data['rate'] === 'number' ? (data['rate'] as number) : 22050,
-            width: typeof data['width'] === 'number' ? (data['width'] as number) : 2,
-            channels: typeof data['channels'] === 'number' ? (data['channels'] as number) : 1,
-          };
-          logger.debug(`TTS audio-start: rate=${audioInfo.rate} width=${audioInfo.width} channels=${audioInfo.channels}`);
+        if (type === 'audio-start') {
+          // Format info may be inline in the header `data` field (older Wyoming) or
+          // in the following data section (data_length > 0). Handle both.
+          if (dataInline && typeof dataInline === 'object') {
+            if (typeof dataInline['rate'] === 'number') audioInfo.rate = dataInline['rate'] as number;
+            if (typeof dataInline['width'] === 'number') audioInfo.width = dataInline['width'] as number;
+            if (typeof dataInline['channels'] === 'number') audioInfo.channels = dataInline['channels'] as number;
+            logger.debug(`TTS audio-start (inline): rate=${audioInfo.rate} width=${audioInfo.width} channels=${audioInfo.channels}`);
+          }
         } else if (type === 'audio-stop') {
           logger.debug(`TTS audio-stop received — ${audioChunks.length} chunks, total: ${audioChunks.reduce((s, c) => s + c.length, 0)} bytes`);
           settle();
           return;
         } else if (type === 'error') {
-          const msg = `Wyoming TTS error from ${opts.host}:${opts.port}: ${JSON.stringify(data)}`;
+          const msg = `Wyoming TTS error from ${opts.host}:${opts.port}: ${JSON.stringify(dataInline)}`;
           logger.error(msg);
           settle(new Error(msg));
           return;
@@ -191,9 +198,11 @@ export async function synthesise(
           logger.debug(`TTS: ignoring unknown event type="${type}"`);
         }
 
-        if (payloadLen > 0) {
-          pendingPayload = payloadLen;
-        }
+        // Queue data section then payload section for the next iterations.
+        pendingEventType = type ?? null;
+        pendingDataLength = dataLen;
+        pendingPayloadLength = payloadLen;
+        pendingDataBuf = Buffer.alloc(0);
       }
     }
 
@@ -209,25 +218,25 @@ export async function synthesise(
     socket.on('data', (chunk: Buffer) => {
       if (settled || timedOut) return;
       logger.debug(`TTS received ${chunk.length} bytes from ${opts.host}:${opts.port}`);
-      if (rawAudioMode) {
-        // Skip the state machine — accumulate directly and reset the idle timer.
-        audioChunks.push(chunk);
-        scheduleRawAudioSettle();
-        return;
-      }
       recvBuf = Buffer.concat([recvBuf, chunk]);
       drain();
     });
 
-    // Fallback: server closes the connection without sending audio-stop.
+    // Server closes the connection after audio-stop (or on error).
     socket.on('end', () => {
-      if (!settled && !timedOut) settle();
+      if (settled || timedOut) return;
+      // Flush any bytes that remain in recvBuf but couldn't form a complete Wyoming
+      // event line (e.g. raw-PCM bytes after the last \n in a non-framed stream).
+      if (recvBuf.length > 0) {
+        audioChunks.push(recvBuf);
+        recvBuf = Buffer.alloc(0);
+      }
+      settle();
     });
 
     socket.on('error', (err) => {
       if (timedOut || settled) return;
       clearTimeout(timeout);
-      if (rawAudioIdleTimer) clearTimeout(rawAudioIdleTimer);
       const msg = `TTS connection error for ${opts.host}:${opts.port} — ${err.message}`;
       logger.error(msg);
       reject(new Error(msg));
