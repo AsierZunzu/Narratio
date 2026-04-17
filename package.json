@@ -34,7 +34,7 @@
   },
   "private": true,
   "dependencies": {
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.9.0",
     "express": "^5.2.1",
     "html-to-text": "^9.0.5",
     "node-cron": "^4.2.1",
