@@ -10,9 +10,12 @@
     a { color: #60a5fa; text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    header { padding: 20px 24px 12px; border-bottom: 1px solid #1e2535; display: flex; align-items: center; gap: 16px; }
+    header { padding: 16px 24px; border-bottom: 1px solid #1e2535; display: flex; align-items: center; gap: 16px; }
     header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
-    header .rss-link { font-size: 12px; color: #94a3b8; }
+    .main-nav { display: flex; gap: 4px; margin-left: auto; }
+    .nav-btn { background: none; border: 1px solid #252d3f; border-radius: 6px; color: #94a3b8; cursor: pointer; font-size: 13px; padding: 5px 14px; font-family: inherit; }
+    .nav-btn:hover { border-color: #3b4a6b; color: #e2e8f0; }
+    .nav-btn.active { background: #1e3a5f; border-color: #2563eb; color: #93c5fd; }
 
     .summary { display: flex; gap: 12px; padding: 16px 24px; flex-wrap: wrap; }
     .stat { background: #1a1f2e; border: 1px solid #252d3f; border-radius: 8px; padding: 10px 16px; min-width: 90px; text-align: center; }
@@ -59,6 +62,10 @@
     .btn-delete:hover { background: #991b1b; }
     .btn-audio  { background: #14532d; color: #86efac; }
     .btn-audio:hover  { background: #166534; }
+    .btn-primary { background: #1d4ed8; color: #bfdbfe; }
+    .btn-primary:hover { background: #1e40af; }
+    .btn-edit { background: #1e2535; color: #94a3b8; }
+    .btn-edit:hover { background: #334155; color: #e2e8f0; }
 
     #toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; padding: 10px 16px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100; }
     #toast.show { opacity: 1; }
@@ -67,96 +74,277 @@
     .btn-view-content { background: none; border: none; cursor: pointer; color: inherit; font: inherit; text-align: left; padding: 0; width: 100%; }
     .btn-view-content:hover a, .btn-view-content:hover { color: #93c5fd; }
 
-    #content-modal { display: none; position: fixed; inset: 0; z-index: 200; }
-    #content-modal.open { display: flex; align-items: flex-end; justify-content: center; }
-    #content-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
+    #content-modal, #feed-modal { display: none; position: fixed; inset: 0; z-index: 200; }
+    #content-modal.open, #feed-modal.open { display: flex; align-items: flex-end; justify-content: center; }
+    #content-backdrop, .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
     #content-panel { position: relative; background: #1a1f2e; border: 1px solid #252d3f; border-radius: 12px 12px 0 0; width: 100%; max-width: 860px; max-height: 70vh; display: flex; flex-direction: column; }
     #content-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #252d3f; gap: 12px; }
     #content-panel-title { font-size: 14px; font-weight: 600; color: #e2e8f0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #content-panel-close { background: none; border: none; color: #64748b; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
-    #content-panel-close:hover { color: #e2e8f0; background: #252d3f; }
+    #content-panel-close, .modal-close { background: none; border: none; color: #64748b; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+    #content-panel-close:hover, .modal-close:hover { color: #e2e8f0; background: #252d3f; }
     #content-panel-body { overflow-y: auto; padding: 20px; flex: 1; }
     #content-panel-body pre { white-space: pre-wrap; word-break: break-word; font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.7; color: #cbd5e1; }
+
+    .modal-panel { position: relative; background: #1a1f2e; border: 1px solid #252d3f; border-radius: 12px 12px 0 0; width: 100%; max-width: 680px; max-height: 85vh; display: flex; flex-direction: column; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #252d3f; }
+    .modal-header span { font-size: 15px; font-weight: 600; }
+    .modal-body { overflow-y: auto; padding: 20px; flex: 1; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-field label { font-size: 12px; color: #94a3b8; font-weight: 500; }
+    .form-field input, .form-field textarea, .form-field select { background: #0f1117; border: 1px solid #252d3f; border-radius: 6px; color: #e2e8f0; font-family: inherit; font-size: 13px; padding: 7px 10px; width: 100%; }
+    .form-field input:focus, .form-field textarea:focus, .form-field select:focus { border-color: #2563eb; outline: none; }
+    .form-field textarea { min-height: 60px; resize: vertical; }
+    .form-field .hint { font-size: 11px; color: #475569; }
+    .form-field .hint a, .form-field .hint span { color: #60a5fa; word-break: break-all; }
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid #1e2535; }
+    details.advanced { border: 1px solid #1e2535; border-radius: 8px; padding: 12px 14px; margin-top: 4px; }
+    details.advanced summary { cursor: pointer; font-size: 12px; color: #64748b; font-weight: 500; user-select: none; }
+    details.advanced[open] summary { color: #94a3b8; margin-bottom: 14px; }
+
+    .feeds-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px 12px; }
+    .feeds-header h2 { font-size: 15px; font-weight: 600; }
+    .feed-url { font-size: 12px; color: #60a5fa; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .quota-cell { font-size: 12px; color: #64748b; }
   </style>
 </head>
 <body>
   <header>
     <h1>Narratio</h1>
-    <a class="rss-link" href="/rss">RSS Feed</a>
+    <div class="main-nav">
+      <button class="nav-btn active" id="nav-articles">Articles</button>
+      <button class="nav-btn" id="nav-feeds">Feeds <span class="tab-count"><%= feeds.length %></span></button>
+    </div>
   </header>
 
-  <div class="summary">
-    <div class="stat"><div class="stat-value"><%= counts.all %></div><div class="stat-label">Total</div></div>
-    <div class="stat"><div class="stat-value" style="color:#94a3b8"><%= counts.pending %></div><div class="stat-label">Pending</div></div>
-    <div class="stat"><div class="stat-value" style="color:#93c5fd"><%= counts.converting %></div><div class="stat-label">Converting</div></div>
-    <div class="stat"><div class="stat-value" style="color:#86efac"><%= counts.done %></div><div class="stat-label">Done</div></div>
-    <div class="stat"><div class="stat-value" style="color:#fca5a5"><%= counts.failed %></div><div class="stat-label">Failed</div></div>
-    <div class="stat"><div class="stat-value" style="color:#fdba74"><%= counts.purged %></div><div class="stat-label">Purged</div></div>
+  <!-- ── Articles View ──────────────────────────────────────────────────────── -->
+  <div id="articles-view">
+    <div class="summary">
+      <div class="stat"><div class="stat-value"><%= counts.all %></div><div class="stat-label">Total</div></div>
+      <div class="stat"><div class="stat-value" style="color:#94a3b8"><%= counts.pending %></div><div class="stat-label">Pending</div></div>
+      <div class="stat"><div class="stat-value" style="color:#93c5fd"><%= counts.converting %></div><div class="stat-label">Converting</div></div>
+      <div class="stat"><div class="stat-value" style="color:#86efac"><%= counts.done %></div><div class="stat-label">Done</div></div>
+      <div class="stat"><div class="stat-value" style="color:#fca5a5"><%= counts.failed %></div><div class="stat-label">Failed</div></div>
+      <div class="stat"><div class="stat-value" style="color:#fdba74"><%= counts.purged %></div><div class="stat-label">Purged</div></div>
+    </div>
+
+    <div class="tabs">
+      <% ['all', 'pending', 'converting', 'done', 'failed', 'purged'].forEach(function(s) { %>
+        <button class="tab" data-filter="<%= s %>"><%= s === 'all' ? 'All' : STATUS_LABELS[s] %> <span class="tab-count"><%= counts[s] %></span></button>
+      <% }); %>
+    </div>
+
+    <div class="table-wrap">
+      <table id="articles-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Words</th>
+            <th>TTS Time</th>
+            <th>Retries</th>
+            <th>Error</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="articles-body">
+          <% if (articles.length === 0) { %>
+            <tr><td colspan="8" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>
+          <% } else { %>
+            <% articles.forEach(function(a) { %>
+              <tr data-guid="<%= a.guid %>" data-status="<%= a.status %>" data-content="<%= a.content || '' %>">
+                <td class="col-title">
+                  <% if (a.content) { %>
+                    <button class="btn-view-content" data-guid="<%= a.guid %>" title="View content"><%= a.title %></button>
+                  <% } else { %>
+                    <%= a.title %>
+                  <% } %>
+                </td>
+                <td class="col-status"><span class="badge badge-<%= a.status %>"><%= STATUS_LABELS[a.status] || a.status %></span></td>
+                <td class="col-date"><%= formatDate(a.pub_date) %></td>
+                <td class="col-words"><%= wordCount(a.content) %></td>
+                <td class="col-tts-time"><%= formatElapsed(a.tts_elapsed_ms) %></td>
+                <td class="col-retries"><%= a.status === 'failed' ? a.tts_retries + '×' : '—' %></td>
+                <td class="col-error">
+                  <% if (a.status === 'failed' && a.error) { %>
+                    <span class="error-msg" title="<%= a.error %>"><%= a.error.length > 60 ? a.error.slice(0, 60) + '…' : a.error %></span>
+                  <% } %>
+                </td>
+                <td class="col-actions">
+                  <% if (a.link) { %>
+                    <a class="btn btn-link" href="<%= a.link %>" target="_blank" rel="noopener">↗ Article</a>
+                  <% } %>
+                  <% if (a.status === 'failed') { %>
+                    <button class="btn btn-retry" data-action="retry" data-guid="<%= a.guid %>">Retry</button>
+                  <% } %>
+                  <% if (a.status === 'done') { %>
+                    <button class="btn btn-purge" data-action="purge" data-guid="<%= a.guid %>">Purge</button>
+                  <% } %>
+                  <% if (a.status === 'done' && a.audio_file) { %>
+                    <a class="btn btn-audio" href="<%= baseUrl %>/audio/<%= encodeURIComponent(a.audio_file) %>">▶ Audio</a>
+                  <% } %>
+                  <button class="btn btn-delete" data-action="delete" data-guid="<%= a.guid %>">Delete</button>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="tabs">
-    <% ['all', 'pending', 'converting', 'done', 'failed', 'purged'].forEach(function(s) { %>
-      <button class="tab" data-filter="<%= s %>"><%= s === 'all' ? 'All' : STATUS_LABELS[s] %> <span class="tab-count"><%= counts[s] %></span></button>
-    <% }); %>
+  <!-- ── Feeds View ─────────────────────────────────────────────────────────── -->
+  <div id="feeds-view" style="display:none">
+    <div class="feeds-header">
+      <h2>RSS Feeds</h2>
+      <button class="btn btn-primary" id="add-feed-btn">+ Add Feed</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Podcast URL</th>
+            <th>RSS Source</th>
+            <th>TTS Service</th>
+            <th>Quotas</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="feeds-body">
+          <% if (feeds.length === 0) { %>
+            <tr><td colspan="6" class="empty">No feeds configured. Click "+ Add Feed" to get started.</td></tr>
+          <% } else { %>
+            <% feeds.forEach(function(f) { %>
+              <% var tts = ttsServices.find(function(s) { return s.id === f.tts_service_id; }); %>
+              <tr data-feed-id="<%= f.id %>">
+                <td><strong><%= f.name %></strong><br><small style="color:#64748b"><%= f.title %></small></td>
+                <td><a class="feed-url" href="<%= baseUrl %>/rss/<%= f.slug %>" target="_blank"><%= baseUrl %>/rss/<%= f.slug %></a></td>
+                <td><small class="feed-url"><%= f.rss_url %></small></td>
+                <td><small><%= tts ? tts.name + ' (' + tts.host + ':' + tts.port + ')' : 'Unknown' %></small></td>
+                <td class="quota-cell">
+                  <%= f.max_audio_files ? f.max_audio_files + ' files' : '∞ files' %><br>
+                  <%= f.max_audio_size_mb ? f.max_audio_size_mb + ' MB' : '∞ MB' %>
+                </td>
+                <td>
+                  <button class="btn btn-edit" data-feed-edit="<%= f.id %>">Edit</button>
+                  <button class="btn btn-delete" data-feed-delete="<%= f.id %>">Delete</button>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="table-wrap">
-    <table id="articles-table">
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Date</th>
-          <th>Words</th>
-          <th>TTS Time</th>
-          <th>Retries</th>
-          <th>Error</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="articles-body">
-        <% if (articles.length === 0) { %>
-          <tr><td colspan="8" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>
-        <% } else { %>
-          <% articles.forEach(function(a) { %>
-            <tr data-guid="<%= a.guid %>" data-status="<%= a.status %>" data-content="<%= a.content || '' %>">
-              <td class="col-title">
-                <% if (a.content) { %>
-                  <button class="btn-view-content" data-guid="<%= a.guid %>" title="View content"><%= a.title %></button>
-                <% } else { %>
-                  <%= a.title %>
+  <!-- ── Feed Modal ─────────────────────────────────────────────────────────── -->
+  <div id="feed-modal">
+    <div class="modal-backdrop" id="feed-modal-backdrop"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span id="feed-modal-title">Add Feed</span>
+        <button class="modal-close" id="feed-modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="feed-form" autocomplete="off">
+          <input type="hidden" id="feed-id" value="">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="f-name">Name <span style="color:#ef4444">*</span></label>
+              <input id="f-name" name="name" required placeholder="My Tech Podcast">
+            </div>
+            <div class="form-field">
+              <label for="f-tts">TTS Service <span style="color:#ef4444">*</span></label>
+              <select id="f-tts" name="tts_service_id" required>
+                <% ttsServices.forEach(function(svc) { %>
+                  <option value="<%= svc.id %>"><%= svc.name %> (<%= svc.host %>:<%= svc.port %>)</option>
+                <% }); %>
+                <% if (ttsServices.length === 0) { %>
+                  <option value="" disabled>No TTS services configured</option>
                 <% } %>
-              </td>
-              <td class="col-status"><span class="badge badge-<%= a.status %>"><%= STATUS_LABELS[a.status] || a.status %></span></td>
-              <td class="col-date"><%= formatDate(a.pub_date) %></td>
-              <td class="col-words"><%= wordCount(a.content) %></td>
-              <td class="col-tts-time"><%= formatElapsed(a.tts_elapsed_ms) %></td>
-              <td class="col-retries"><%= a.status === 'failed' ? a.tts_retries + '×' : '—' %></td>
-              <td class="col-error">
-                <% if (a.status === 'failed' && a.error) { %>
-                  <span class="error-msg" title="<%= a.error %>"><%= a.error.length > 60 ? a.error.slice(0, 60) + '…' : a.error %></span>
-                <% } %>
-              </td>
-              <td class="col-actions">
-                <% if (a.link) { %>
-                  <a class="btn btn-link" href="<%= a.link %>" target="_blank" rel="noopener">↗ Article</a>
-                <% } %>
-                <% if (a.status === 'failed') { %>
-                  <button class="btn btn-retry" data-action="retry" data-guid="<%= a.guid %>">Retry</button>
-                <% } %>
-                <% if (a.status === 'done') { %>
-                  <button class="btn btn-purge" data-action="purge" data-guid="<%= a.guid %>">Purge</button>
-                <% } %>
-                <% if (a.status === 'done' && a.audio_file) { %>
-                  <a class="btn btn-audio" href="<%= baseUrl %>/audio/<%= encodeURIComponent(a.audio_file) %>">▶ Audio</a>
-                <% } %>
-                <button class="btn btn-delete" data-action="delete" data-guid="<%= a.guid %>">Delete</button>
-              </td>
-            </tr>
-          <% }); %>
-        <% } %>
-      </tbody>
-    </table>
+              </select>
+            </div>
+            <div class="form-field full">
+              <label for="f-rss-url">RSS URL <span style="color:#ef4444">*</span></label>
+              <input id="f-rss-url" name="rss_url" type="url" required placeholder="https://example.com/feed.xml">
+            </div>
+            <div class="form-field">
+              <label for="f-slug">Slug <span style="color:#ef4444">*</span></label>
+              <input id="f-slug" name="slug" required pattern="[a-z0-9-]+" placeholder="my-tech-podcast">
+              <span class="hint">Podcast URL: <span id="f-slug-preview"></span></span>
+            </div>
+            <div class="form-field">
+              <label for="f-title">Podcast Title <span style="color:#ef4444">*</span></label>
+              <input id="f-title" name="title" required placeholder="My Tech Podcast">
+            </div>
+            <div class="form-field full">
+              <label for="f-desc">Description</label>
+              <textarea id="f-desc" name="description" placeholder="A brief description of this podcast"></textarea>
+            </div>
+            <div class="form-field">
+              <label for="f-author">Author</label>
+              <input id="f-author" name="author" placeholder="Narratio Worker">
+            </div>
+            <div class="form-field">
+              <label for="f-lang">Language</label>
+              <input id="f-lang" name="language" placeholder="en">
+            </div>
+            <div class="form-field">
+              <label for="f-max-files">Max Audio Files</label>
+              <input id="f-max-files" name="max_audio_files" type="number" min="1" placeholder="Unlimited">
+              <span class="hint">Leave empty for no limit</span>
+            </div>
+            <div class="form-field">
+              <label for="f-max-size">Max Audio Size (MB)</label>
+              <input id="f-max-size" name="max_audio_size_mb" type="number" min="1" placeholder="Unlimited">
+              <span class="hint">Leave empty for no limit</span>
+            </div>
+          </div>
+
+          <details class="advanced" style="margin-top:16px">
+            <summary>Advanced (iTunes metadata &amp; messages)</summary>
+            <div class="form-grid" style="margin-top:4px">
+              <div class="form-field">
+                <label for="f-itunes-author">iTunes Author</label>
+                <input id="f-itunes-author" name="itunes_author">
+              </div>
+              <div class="form-field">
+                <label for="f-itunes-category">iTunes Category</label>
+                <input id="f-itunes-category" name="itunes_category" placeholder="Technology">
+              </div>
+              <div class="form-field">
+                <label for="f-itunes-owner-name">iTunes Owner Name</label>
+                <input id="f-itunes-owner-name" name="itunes_owner_name">
+              </div>
+              <div class="form-field">
+                <label for="f-itunes-owner-email">iTunes Owner Email</label>
+                <input id="f-itunes-owner-email" name="itunes_owner_email" type="email">
+              </div>
+              <div class="form-field full">
+                <label for="f-itunes-summary">iTunes Summary</label>
+                <textarea id="f-itunes-summary" name="itunes_summary"></textarea>
+              </div>
+              <div class="form-field full">
+                <label for="f-unavailable-msg">Unavailable Episode Message</label>
+                <textarea id="f-unavailable-msg" name="unavailable_message" placeholder="This content is no longer available on the server."></textarea>
+              </div>
+              <div class="form-field full">
+                <label for="f-failed-msg">TTS Failed Message</label>
+                <textarea id="f-failed-msg" name="tts_failed_message" placeholder="This podcast episode could not be generated due to a text-to-speech error."></textarea>
+              </div>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-link" id="feed-form-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="feed-form-submit">Save Feed</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <div id="toast"></div>
@@ -178,6 +366,9 @@
 
     function escAttr(s) {
       return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     function clientFormatDate(d) {
       if (!d) return '—';
@@ -203,6 +394,189 @@
       toast._t = setTimeout(() => { toast.className = ''; }, 3000);
     }
 
+    // ── View switching ────────────────────────────────────────────────────────
+    const navArticles = document.getElementById('nav-articles');
+    const navFeeds = document.getElementById('nav-feeds');
+    const articlesView = document.getElementById('articles-view');
+    const feedsView = document.getElementById('feeds-view');
+
+    function showView(view) {
+      if (view === 'feeds') {
+        articlesView.style.display = 'none';
+        feedsView.style.display = '';
+        navArticles.classList.remove('active');
+        navFeeds.classList.add('active');
+        refreshFeedsTable();
+      } else {
+        feedsView.style.display = 'none';
+        articlesView.style.display = '';
+        navFeeds.classList.remove('active');
+        navArticles.classList.add('active');
+      }
+    }
+
+    navArticles.addEventListener('click', () => showView('articles'));
+    navFeeds.addEventListener('click', () => showView('feeds'));
+
+    // ── Feeds table ───────────────────────────────────────────────────────────
+    async function refreshFeedsTable() {
+      try {
+        const res = await fetch('/api/feeds');
+        if (!res.ok) return;
+        const feeds = await res.json();
+        const ttsRes = await fetch('/api/tts-services');
+        const ttsServices = ttsRes.ok ? await ttsRes.json() : [];
+        const ttsMap = Object.fromEntries(ttsServices.map(s => [s.id, s]));
+
+        const tbody = document.getElementById('feeds-body');
+        if (feeds.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">No feeds configured. Click "+ Add Feed" to get started.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = feeds.map(f => {
+          const tts = ttsMap[f.tts_service_id];
+          const ttsLabel = tts ? escHtml(tts.name + ' (' + tts.host + ':' + tts.port + ')') : 'Unknown';
+          const podcastUrl = BASE_URL + '/rss/' + escAttr(f.slug);
+          const files = f.max_audio_files ? f.max_audio_files + ' files' : '∞ files';
+          const size = f.max_audio_size_mb ? f.max_audio_size_mb + ' MB' : '∞ MB';
+          return `<tr data-feed-id="${escAttr(f.id)}">
+            <td><strong>${escHtml(f.name)}</strong><br><small style="color:#64748b">${escHtml(f.title)}</small></td>
+            <td><a class="feed-url" href="${podcastUrl}" target="_blank">${escHtml(podcastUrl)}</a></td>
+            <td><small class="feed-url">${escHtml(f.rss_url)}</small></td>
+            <td><small>${ttsLabel}</small></td>
+            <td class="quota-cell">${escHtml(files)}<br>${escHtml(size)}</td>
+            <td>
+              <button class="btn btn-edit" data-feed-edit="${escAttr(f.id)}">Edit</button>
+              <button class="btn btn-delete" data-feed-delete="${escAttr(f.id)}">Delete</button>
+            </td>
+          </tr>`;
+        }).join('');
+
+        // update nav badge
+        navFeeds.querySelector('.tab-count').textContent = feeds.length;
+      } catch { /* silent */ }
+    }
+
+    // ── Feed modal ────────────────────────────────────────────────────────────
+    const feedModal = document.getElementById('feed-modal');
+    const feedModalTitle = document.getElementById('feed-modal-title');
+    const feedForm = document.getElementById('feed-form');
+    const feedIdInput = document.getElementById('feed-id');
+    const slugInput = document.getElementById('f-slug');
+    const slugPreview = document.getElementById('f-slug-preview');
+
+    slugInput.addEventListener('input', () => {
+      slugPreview.textContent = BASE_URL + '/rss/' + (slugInput.value || '…');
+    });
+
+    function openFeedModal(feed) {
+      feedForm.reset();
+      if (feed) {
+        feedModalTitle.textContent = 'Edit Feed';
+        feedIdInput.value = feed.id;
+        feedForm.elements['name'].value = feed.name || '';
+        feedForm.elements['rss_url'].value = feed.rss_url || '';
+        feedForm.elements['slug'].value = feed.slug || '';
+        feedForm.elements['title'].value = feed.title || '';
+        feedForm.elements['description'].value = feed.description || '';
+        feedForm.elements['author'].value = feed.author || '';
+        feedForm.elements['language'].value = feed.language || '';
+        feedForm.elements['tts_service_id'].value = feed.tts_service_id || '';
+        feedForm.elements['max_audio_files'].value = feed.max_audio_files || '';
+        feedForm.elements['max_audio_size_mb'].value = feed.max_audio_size_mb || '';
+        feedForm.elements['itunes_author'].value = feed.itunes_author || '';
+        feedForm.elements['itunes_category'].value = feed.itunes_category || '';
+        feedForm.elements['itunes_owner_name'].value = feed.itunes_owner_name || '';
+        feedForm.elements['itunes_owner_email'].value = feed.itunes_owner_email || '';
+        feedForm.elements['itunes_summary'].value = feed.itunes_summary || '';
+        feedForm.elements['unavailable_message'].value = feed.unavailable_message || '';
+        feedForm.elements['tts_failed_message'].value = feed.tts_failed_message || '';
+        slugPreview.textContent = BASE_URL + '/rss/' + feed.slug;
+      } else {
+        feedModalTitle.textContent = 'Add Feed';
+        feedIdInput.value = '';
+        slugPreview.textContent = BASE_URL + '/rss/…';
+      }
+      feedModal.classList.add('open');
+    }
+
+    function closeFeedModal() {
+      feedModal.classList.remove('open');
+    }
+
+    document.getElementById('feed-modal-close').addEventListener('click', closeFeedModal);
+    document.getElementById('feed-form-cancel').addEventListener('click', closeFeedModal);
+    document.getElementById('feed-modal-backdrop').addEventListener('click', closeFeedModal);
+    document.getElementById('add-feed-btn').addEventListener('click', () => openFeedModal(null));
+
+    feedForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = feedIdInput.value;
+      const data = Object.fromEntries(new FormData(feedForm).entries());
+
+      // Coerce numeric fields
+      if (data['max_audio_files'] === '') delete data['max_audio_files'];
+      else if (data['max_audio_files']) data['max_audio_files'] = Number(data['max_audio_files']);
+      if (data['max_audio_size_mb'] === '') delete data['max_audio_size_mb'];
+      else if (data['max_audio_size_mb']) data['max_audio_size_mb'] = Number(data['max_audio_size_mb']);
+      data['tts_service_id'] = Number(data['tts_service_id']);
+
+      const submitBtn = document.getElementById('feed-form-submit');
+      submitBtn.disabled = true;
+      try {
+        const url = id ? '/api/feeds/' + encodeURIComponent(id) : '/api/feeds';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (res.ok) {
+          showToast(id ? 'Feed updated' : 'Feed created', false);
+          closeFeedModal();
+          refreshFeedsTable();
+        } else {
+          showToast(await res.text(), true);
+        }
+      } catch {
+        showToast('Network error', true);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('feeds-body').addEventListener('click', async (e) => {
+      const editBtn = e.target.closest('[data-feed-edit]');
+      const deleteBtn = e.target.closest('[data-feed-delete]');
+
+      if (editBtn) {
+        const id = editBtn.dataset.feedEdit;
+        try {
+          const res = await fetch('/api/feeds');
+          const feeds = await res.json();
+          const feed = feeds.find(f => String(f.id) === String(id));
+          if (feed) openFeedModal(feed);
+        } catch { showToast('Failed to load feed data', true); }
+        return;
+      }
+
+      if (deleteBtn) {
+        const id = deleteBtn.dataset.feedDelete;
+        if (!confirm('Delete this feed? This cannot be undone.')) return;
+        deleteBtn.disabled = true;
+        try {
+          const res = await fetch('/api/feeds/' + encodeURIComponent(id), { method: 'DELETE' });
+          if (res.ok) {
+            showToast('Feed deleted', false);
+            refreshFeedsTable();
+          } else {
+            showToast(await res.text(), true);
+            deleteBtn.disabled = false;
+          }
+        } catch {
+          showToast('Network error', true);
+          deleteBtn.disabled = false;
+        }
+      }
+    });
+
+    // ── Articles: counts & filter ─────────────────────────────────────────────
     function recalcCounts() {
       const rows = [...document.querySelectorAll('#articles-body tr[data-status]')];
       const counts = { all: rows.length, pending: 0, converting: 0, done: 0, failed: 0, purged: 0 };
@@ -389,7 +763,12 @@
 
     closeBtn.addEventListener('click', closeContentPanel);
     backdrop.addEventListener('click', closeContentPanel);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContentPanel(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeContentPanel();
+        closeFeedModal();
+      }
+    });
 
     document.getElementById('articles-body').addEventListener('click', (e) => {
       const viewBtn = e.target.closest('.btn-view-content');
