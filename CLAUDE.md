@@ -25,7 +25,7 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 | Entry point | Role |
 |---|---|
 | `src/worker/index.ts` | RSS poller + TTS dispatcher. Runs once on startup, then on `POLL_INTERVAL` cron if set. Handles `--force-reset`, `--retry-failed`, and `--regen-audio` CLI flags. |
-| `src/server/index.ts` | Express HTTP server. Two routes: `GET /audio/:file` (static WAV files) and `GET /rss` (podcast XML). |
+| `src/server/index.ts` | Express HTTP server. Serves an admin dashboard at `/`, per-feed podcast XML at `/rss/:slug`, and static audio at `/audio/:file`. Exposes REST APIs under `/api/` for articles, feeds, and TTS services. |
 
 ### Worker CLI flags
 
