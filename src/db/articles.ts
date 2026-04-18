@@ -7,6 +7,7 @@ export type { Article, ArticleStatus } from './index.js';
 export interface InsertArticleParams {
   guid: string;
   feed_url: string;
+  feed_id?: number | null;
   title: string;
   link: string | null;
   pub_date: string | null;
