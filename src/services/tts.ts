@@ -19,19 +19,33 @@ interface AudioInfo {
 /**
  * Synthesises text via a Piper Wyoming TTS server (TCP).
  *
- * Wyoming protocol:
- *   1. Connect to TCP socket.
- *   2. Send: {"type":"synthesize","data":{"text":"..."}}\n
- *   3. Receive a stream of framed events.  Each event is three contiguous sections:
- *        a) JSON header line (\n-terminated):
- *             {"type":"audio-start","data_length":N,"payload_length":0}
- *             {"type":"audio-chunk","data_length":N,"payload_length":M}
- *             {"type":"audio-stop","data_length":0,"payload_length":0}
- *        b) data section: data_length bytes of UTF-8 JSON (audio format: rate/width/channels)
- *        c) payload section: payload_length bytes of raw binary PCM
- *   4. On audio-stop (or connection close): assemble a WAV file and write it.
+ * Wyoming protocol — each event arrives as three contiguous sections:
+ *   1. JSON header line (\n-terminated):
+ *        {"type":"audio-start","data_length":N,"payload_length":0}
+ *        {"type":"audio-chunk","data_length":N,"payload_length":M}
+ *        {"type":"audio-stop","data_length":0,"payload_length":0}
+ *      The header carries `data_length` (bytes of the following UTF-8 JSON data
+ *      section) and `payload_length` (bytes of the following raw binary PCM section).
+ *   2. Data section: `data_length` bytes of UTF-8 JSON containing audio format
+ *      metadata (rate, width, channels).  Present on audio-start and audio-chunk.
+ *   3. Payload section: `payload_length` bytes of raw binary PCM audio.
+ *      Present on audio-chunk only; zero-length for audio-start and audio-stop.
  *
- * Returns the absolute path of the written WAV file.
+ * Inline-data fallback: older Wyoming builds embed format info directly in the
+ * header's `data` field (e.g. `{"type":"audio-start","data":{"rate":N,...},"payload_length":0}`)
+ * instead of using a separate data section.  Both forms are handled; the inline
+ * `data` field is read first, then overridden by any subsequent data section.
+ *
+ * Non-JSON fallback: if a line in the stream fails JSON parsing the bytes are
+ * treated as raw PCM and accumulated as audio so that non-framed streams still
+ * produce valid output.
+ *
+ * On audio-stop (or connection close): all accumulated PCM chunks are assembled
+ * into a WAV file.  If the collected bytes already carry a RIFF header they are
+ * written as-is; otherwise a 44-byte WAV header is prepended using the format
+ * captured from the data sections (defaulting to 22050 Hz / 16-bit / mono).
+ *
+ * @returns The absolute path of the written WAV file.
  */
 
 export async function synthesise(
