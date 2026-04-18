@@ -2,7 +2,10 @@ import cron from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
+import type { Feed, TtsService } from '../db/index.js';
 import { resetFailedRetries, resetConvertingArticles, resetAllArticlesForRegen } from '../db/articles.js';
+import { getFeeds } from '../db/feeds.js';
+import { getTtsServiceById } from '../db/tts-services.js';
 import { processFeed, processPendingArticles } from '../services/rss.js';
 import { runCleanup } from '../services/cleanup.js';
 import { env } from '../utils/env.js';
@@ -12,12 +15,13 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 
-function buildTtsOpts() {
+function buildTtsOpts(feed: Feed, ttsService: TtsService) {
   return {
+    feedId: feed.id,
     maxRetries: env.TTS_MAX_RETRIES(),
     tts: {
-      host: env.PIPER_HOST(),
-      port: env.PIPER_PORT(),
+      host: ttsService.host,
+      port: ttsService.port,
       timeoutMs: env.TTS_TIMEOUT(),
       outputDir: AUDIO_DIR,
     },
@@ -25,18 +29,19 @@ function buildTtsOpts() {
   };
 }
 
-function buildRssOpts() {
+function buildRssOpts(feed: Feed, ttsService: TtsService) {
   return {
-    feedUrl: env.RSS_URL(),
+    feedUrl: feed.rss_url,
     fetchTimeoutMs: env.RSS_FETCH_TIMEOUT(),
-    ...buildTtsOpts(),
+    ...buildTtsOpts(feed, ttsService),
   };
 }
 
-function buildCleanupOpts() {
+function buildCleanupOpts(feed: Feed) {
   return {
-    maxAudioFiles: env.MAX_AUDIO_FILES(),
-    maxAudioSizeMb: env.MAX_AUDIO_SIZE_MB(),
+    feedId: feed.id,
+    maxAudioFiles: feed.max_audio_files ?? Infinity,
+    maxAudioSizeMb: feed.max_audio_size_mb ?? Infinity,
     audioDir: AUDIO_DIR,
   };
 }
@@ -56,8 +61,20 @@ async function runOnce(isFirst = false): Promise<void> {
     if (stuck > 0) logger.warn(`Reset ${stuck} stuck 'converting' articles to pending`);
   }
   try {
-    await processFeed(db, buildRssOpts());
-    runCleanup(db, buildCleanupOpts());
+    const feeds = getFeeds(db);
+    if (feeds.length === 0) {
+      logger.warn('No feeds configured — nothing to process');
+      return;
+    }
+    for (const feed of feeds) {
+      const ttsService = getTtsServiceById(db, feed.tts_service_id);
+      if (!ttsService) {
+        logger.warn(`Feed "${feed.name}" references unknown TTS service id=${feed.tts_service_id}, skipping`);
+        continue;
+      }
+      await processFeed(db, buildRssOpts(feed, ttsService));
+      runCleanup(db, buildCleanupOpts(feed));
+    }
   } catch (err) {
     logger.error('Worker run failed', err);
   } finally {
@@ -70,7 +87,12 @@ async function runPendingCheck(): Promise<void> {
   isRunning = true;
   try {
     const db = getDb(DB_PATH);
-    await processPendingArticles(db, buildTtsOpts());
+    const feeds = getFeeds(db);
+    for (const feed of feeds) {
+      const ttsService = getTtsServiceById(db, feed.tts_service_id);
+      if (!ttsService) continue;
+      await processPendingArticles(db, buildTtsOpts(feed, ttsService));
+    }
   } catch (err) {
     logger.error('Pending check failed', err);
   } finally {

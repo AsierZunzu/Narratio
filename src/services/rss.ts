@@ -6,8 +6,8 @@ import { htmlToText } from '../utils/html.js';
 import { logger } from '../utils/logger.js';
 import {
   insertArticle,
-  getPendingArticles,
-  getRetryableArticles,
+  getPendingArticlesByFeed,
+  getRetryableArticlesByFeed,
   getArticleByGuid,
   markArticleConverting,
   markArticleDone,
@@ -86,6 +86,7 @@ async function fetchFullContent(url: string, timeoutMs: number): Promise<string 
 }
 
 export interface TtsBatchOptions {
+  feedId: number;
   maxRetries: number;
   tts: TtsOptions;
   audioDir: string;
@@ -99,9 +100,9 @@ export interface RssServiceOptions extends TtsBatchOptions {
 export async function processPendingArticles(db: Db, opts: TtsBatchOptions): Promise<void> {
   // Snapshot retryable articles BEFORE processing pending ones, so articles
   // that fail in this run are not immediately retried in the same pass.
-  const retryable = opts.maxRetries > 0 ? getRetryableArticles(db, opts.maxRetries) : [];
+  const retryable = opts.maxRetries > 0 ? getRetryableArticlesByFeed(db, opts.feedId, opts.maxRetries) : [];
 
-  const pending = getPendingArticles(db);
+  const pending = getPendingArticlesByFeed(db, opts.feedId);
   if (pending.length === 0 && retryable.length === 0) return;
 
   logger.info(`Processing ${pending.length} pending articles`);
@@ -154,6 +155,7 @@ export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void
     const inserted = insertArticle(db, {
       guid,
       feed_url: opts.feedUrl,
+      feed_id: opts.feedId,
       title: item.title ?? 'Untitled',
       link: item.link ?? null,
       pub_date: item.pubDate ?? item.isoDate ?? null,

@@ -21,8 +21,8 @@ function requireStr(key: string): string {
 }
 
 export const env = {
-  // Worker
-  RSS_URL: () => requireStr('RSS_URL'),
+  // Worker — RSS_URL is only used for initial DB seeding; not required at runtime
+  RSS_URL: () => str('RSS_URL'),
   POLL_INTERVAL: () => str('POLL_INTERVAL'),
   PIPER_HOST: () => str('PIPER_HOST', 'localhost'),
   PIPER_PORT: () => num('PIPER_PORT', 10200),
