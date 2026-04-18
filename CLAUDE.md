@@ -45,7 +45,7 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 
 `src/db/index.ts` — singleton `better-sqlite3` + Drizzle ORM instance. Applies schema inline via `CREATE TABLE IF NOT EXISTS` and runs an inline migration for `tts_elapsed_ms`. No separate migration tool.
 
-`src/db/schema.ts` — single `articles` table. Status lifecycle: `pending` → `converting` → `done` | `failed` → `purged`.
+`src/db/schema.ts` — three tables: `tts_services` (TTS endpoint configurations), `feeds` (podcast feed configurations including metadata and per-feed overrides), and `articles` (fetched article records; status lifecycle: `pending` → `converting` → `done` | `failed` → `purged`).
 
 `src/db/articles.ts` — all DB queries as plain exported functions accepting a `Db` argument (no class, no global state). `resetAllArticlesForRegen` resets every article to `pending` with zero retries and clears `audio_file`; used by `--regen-audio`.
 
