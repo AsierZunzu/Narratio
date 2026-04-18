@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, count } from 'drizzle-orm';
 import type { Db } from './index.js';
 import { feeds } from './schema.js';
 
@@ -51,4 +51,9 @@ export function updateFeed(db: Db, id: number, params: UpdateFeedParams) {
 export function deleteFeed(db: Db, id: number): boolean {
   const result = db.delete(feeds).where(eq(feeds.id, id)).run();
   return result.changes > 0;
+}
+
+export function countFeedsByTtsService(db: Db, ttsServiceId: number): number {
+  const result = db.select({ count: count() }).from(feeds).where(eq(feeds.tts_service_id, ttsServiceId)).get();
+  return result?.count ?? 0;
 }
