@@ -31,6 +31,11 @@
     .table-wrap { overflow-x: auto; padding: 0 24px 32px; }
     table { width: 100%; border-collapse: collapse; }
     th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 8px 10px; border-bottom: 1px solid #1e2535; }
+    th[data-col] { cursor: pointer; user-select: none; white-space: nowrap; }
+    th[data-col]:hover { color: #94a3b8; }
+    th[data-col]::after { content: ' ↕'; color: #334155; font-size: 10px; }
+    th[data-col].sort-asc::after { content: ' ↑'; color: #60a5fa; }
+    th[data-col].sort-desc::after { content: ' ↓'; color: #60a5fa; }
     td { padding: 9px 10px; border-bottom: 1px solid #151a28; vertical-align: middle; }
     tr:hover td { background: #141926; }
     .empty { color: #475569; padding: 24px; text-align: center; }
@@ -144,13 +149,13 @@
       <table id="articles-table">
         <thead>
           <tr>
-            <th>Title</th>
+            <th data-col="title">Title</th>
             <th>Feed</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Words</th>
-            <th>TTS Time</th>
-            <th>Retries</th>
+            <th data-col="status">Status</th>
+            <th data-col="date">Date</th>
+            <th data-col="words">Words</th>
+            <th data-col="tts-time">TTS Time</th>
+            <th data-col="retries">Retries</th>
             <th>Error</th>
             <th>Actions</th>
           </tr>
@@ -162,7 +167,7 @@
             <% articles.forEach(function(a) { %>
               <% var articleFeed = a.feed_id ? feedMap[a.feed_id] : null; %>
               <tr data-guid="<%= a.guid %>" data-status="<%= a.status %>" data-feed-id="<%= a.feed_id || '' %>" data-content="<%= a.content || '' %>">
-                <td class="col-title">
+                <td class="col-title" data-val="<%= a.title.toLowerCase() %>">
                   <% if (a.content) { %>
                     <button class="btn-view-content" data-guid="<%= a.guid %>" title="View content"><%= a.title %></button>
                   <% } else { %>
@@ -176,11 +181,11 @@
                     <span style="color:#475569">—</span>
                   <% } %>
                 </td>
-                <td class="col-status"><span class="badge badge-<%= a.status %>"><%= STATUS_LABELS[a.status] || a.status %></span></td>
-                <td class="col-date"><%= formatDate(a.pub_date) %></td>
-                <td class="col-words"><%= wordCount(a.content) %></td>
-                <td class="col-tts-time"><%= formatElapsed(a.tts_elapsed_ms) %></td>
-                <td class="col-retries"><%= a.status === 'failed' ? a.tts_retries + '×' : '—' %></td>
+                <td class="col-status" data-val="<%= a.status %>"><span class="badge badge-<%= a.status %>"><%= STATUS_LABELS[a.status] || a.status %></span></td>
+                <td class="col-date" data-val="<%= a.pub_date || '' %>"><%= formatDate(a.pub_date) %></td>
+                <td class="col-words" data-val="<%= wordCountNum(a.content) %>"><%= wordCount(a.content) %></td>
+                <td class="col-tts-time" data-val="<%= a.tts_elapsed_ms != null ? a.tts_elapsed_ms : -1 %>"><%= formatElapsed(a.tts_elapsed_ms) %></td>
+                <td class="col-retries" data-val="<%= a.tts_retries != null ? a.tts_retries : -1 %>"><%= a.status === 'failed' ? a.tts_retries + '×' : '—' %></td>
                 <td class="col-error">
                   <% if (a.status === 'failed' && a.error) { %>
                     <span class="error-msg" title="<%= a.error %>"><%= a.error.length > 60 ? a.error.slice(0, 60) + '…' : a.error %></span>
@@ -470,6 +475,12 @@
       const text = content.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').trim();
       if (!text) return '—';
       return text.split(/\s+/).filter(Boolean).length + ' w';
+    }
+    function clientWordCountNum(content) {
+      if (!content) return -1;
+      const text = content.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').trim();
+      if (!text) return -1;
+      return text.split(/\s+/).filter(Boolean).length;
     }
 
     const toast = document.getElementById('toast');
@@ -844,6 +855,7 @@
       document.querySelectorAll('#articles-body tr[data-status]').forEach(row => {
         row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
       });
+      sortTable();
     }
 
     function buildFeedCell(feedId) {
@@ -851,6 +863,58 @@
       if (!feed) return '<span style="color:#475569">—</span>';
       return `<a href="${BASE_URL}/rss/${escAttr(feed.slug)}" target="_blank" rel="noopener" title="${escAttr(feed.rss_url)}">${escHtml(feed.name)}</a>`;
     }
+
+    // ── Column sorting ────────────────────────────────────────────────────────
+    let sortCol = null;
+    let sortDir = 'asc';
+
+    const COL_CLASS = {
+      title: 'col-title', status: 'col-status', date: 'col-date',
+      words: 'col-words', 'tts-time': 'col-tts-time', retries: 'col-retries',
+    };
+    const COL_TYPE = {
+      title: 'str', status: 'str', date: 'str',
+      words: 'num', 'tts-time': 'num', retries: 'num',
+    };
+
+    function sortTable() {
+      if (!sortCol) return;
+      const tbody = document.getElementById('articles-body');
+      const rows = [...tbody.querySelectorAll('tr[data-guid]')];
+      const type = COL_TYPE[sortCol];
+      const cls = COL_CLASS[sortCol];
+      rows.sort((a, b) => {
+        const tdA = a.querySelector('.' + cls);
+        const tdB = b.querySelector('.' + cls);
+        let va = tdA ? (tdA.dataset.val || '') : '';
+        let vb = tdB ? (tdB.dataset.val || '') : '';
+        if (type === 'num') {
+          va = parseFloat(va);
+          vb = parseFloat(vb);
+          if (isNaN(va)) va = -Infinity;
+          if (isNaN(vb)) vb = -Infinity;
+        }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    document.querySelectorAll('#articles-table th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortCol = col;
+          sortDir = 'asc';
+        }
+        document.querySelectorAll('#articles-table th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+        th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+        sortTable();
+      });
+    });
 
     function buildRow(a) {
       const label = STATUS_LABELS[a.status] || a.status;
@@ -874,13 +938,13 @@
       actions += `<button class="btn btn-delete" data-action="delete" data-guid="${escAttr(a.guid)}">Delete</button>`;
 
       return `<tr data-guid="${escAttr(a.guid)}" data-status="${escAttr(a.status)}" data-feed-id="${escAttr(a.feed_id ?? '')}" data-content="${escAttr(content)}">
-        <td class="col-title">${titleCell}</td>
+        <td class="col-title" data-val="${escAttr((a.title || '').toLowerCase())}">${titleCell}</td>
         <td class="col-feed">${buildFeedCell(a.feed_id)}</td>
-        <td class="col-status"><span class="badge badge-${escAttr(a.status)}">${escAttr(label)}</span></td>
-        <td class="col-date">${clientFormatDate(a.pub_date)}</td>
-        <td class="col-words">${clientWordCount(a.content)}</td>
-        <td class="col-tts-time">${clientFormatElapsed(a.tts_elapsed_ms)}</td>
-        <td class="col-retries">${a.status === 'failed' ? escAttr(String(a.tts_retries)) + '×' : '—'}</td>
+        <td class="col-status" data-val="${escAttr(a.status)}"><span class="badge badge-${escAttr(a.status)}">${escAttr(label)}</span></td>
+        <td class="col-date" data-val="${escAttr(a.pub_date || '')}">${clientFormatDate(a.pub_date)}</td>
+        <td class="col-words" data-val="${clientWordCountNum(a.content)}">${clientWordCount(a.content)}</td>
+        <td class="col-tts-time" data-val="${a.tts_elapsed_ms != null ? a.tts_elapsed_ms : -1}">${clientFormatElapsed(a.tts_elapsed_ms)}</td>
+        <td class="col-retries" data-val="${a.tts_retries != null ? a.tts_retries : -1}">${a.status === 'failed' ? escAttr(String(a.tts_retries)) + '×' : '—'}</td>
         <td class="col-error">${errorHtml}</td>
         <td class="col-actions">${actions}</td>
       </tr>`;
@@ -955,7 +1019,7 @@
         tbody.innerHTML = '<tr><td colspan="9" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>';
       }
 
-      if (changed) { recalcCounts(); applyFilter(); }
+      if (changed) { recalcCounts(); applyFilter(); sortTable(); }
       window.scrollTo(0, savedY);
     }
 
