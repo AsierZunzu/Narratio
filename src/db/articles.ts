@@ -127,6 +127,11 @@ export function countDoneArticles(db: Db): number {
   return result?.count ?? 0;
 }
 
+export function countArticlesByFeed(db: Db, feedId: number): number {
+  const result = db.select({ count: count() }).from(articles).where(eq(articles.feed_id, feedId)).get();
+  return result?.count ?? 0;
+}
+
 export function updateArticleStatus(db: Db, guid: string, status: ArticleStatus): void {
   db.update(articles).set({ status }).where(eq(articles.guid, guid)).run();
 }

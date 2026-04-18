@@ -5,8 +5,8 @@ import fs from 'fs';
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
-import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid } from '../db/articles.js';
-import { getFeeds, getFeedBySlug } from '../db/feeds.js';
+import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, countArticlesByFeed } from '../db/articles.js';
+import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeed } from '../db/feeds.js';
 import { getTtsServices, getTtsServiceById } from '../db/tts-services.js';
 import { synthesise } from '../services/tts.js';
 import { env } from '../utils/env.js';
@@ -100,8 +100,9 @@ export function createApp(dbPath = DB_PATH): express.Application {
     const baseUrl = process.env['BASE_URL'] ?? `${req.protocol}://${req.get('host')}`;
     try {
       const articles = getAllArticles(db);
-      const feeds = getFeeds(db);
-      const html = renderDashboard(articles, baseUrl, feeds);
+      const feedsList = getFeeds(db);
+      const ttsServicesList = getTtsServices(db);
+      const html = renderDashboard(articles, baseUrl, feedsList, ttsServicesList);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } catch (err) {
@@ -160,6 +161,105 @@ export function createApp(dbPath = DB_PATH): express.Application {
 
     markArticlePurged(db, guid);
     res.status(204).end();
+  });
+
+  // ── Feeds API ───────────────────────────────────────────────────────────────
+
+  app.get('/api/feeds', (_req, res) => {
+    const feedsList = getFeeds(db).map((feed) => ({
+      ...feed,
+      tts_service_name: getTtsServiceById(db, feed.tts_service_id)?.name ?? 'Unknown',
+    }));
+    res.json(feedsList);
+  });
+
+  app.post('/api/feeds', (req, res) => {
+    const { name, rss_url, slug, title, tts_service_id, ...rest } = req.body ?? {};
+
+    if (!name || !rss_url || !slug || !title || !tts_service_id) {
+      res.status(400).send('Missing required fields: name, rss_url, slug, title, tts_service_id');
+      return;
+    }
+    if (!/^[a-z0-9-]+$/.test(String(slug))) {
+      res.status(400).send('Slug must contain only lowercase letters, numbers, and hyphens');
+      return;
+    }
+    if (!getTtsServiceById(db, Number(tts_service_id))) {
+      res.status(400).send('TTS service not found');
+      return;
+    }
+
+    try {
+      const feed = insertFeed(db, { name, rss_url, slug, title, tts_service_id: Number(tts_service_id), ...rest });
+      res.status(201).json(feed);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('UNIQUE constraint failed')) {
+        res.status(409).send('A feed with this slug already exists');
+        return;
+      }
+      logger.error('Failed to create feed', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  app.put('/api/feeds/:id', (req, res) => {
+    const id = Number(req.params['id']);
+    if (!getFeedById(db, id)) {
+      res.status(404).send('Feed not found');
+      return;
+    }
+
+    const { slug, tts_service_id, ...rest } = req.body ?? {};
+
+    if (slug !== undefined && !/^[a-z0-9-]+$/.test(String(slug))) {
+      res.status(400).send('Slug must contain only lowercase letters, numbers, and hyphens');
+      return;
+    }
+    if (tts_service_id !== undefined && !getTtsServiceById(db, Number(tts_service_id))) {
+      res.status(400).send('TTS service not found');
+      return;
+    }
+
+    const params = {
+      ...rest,
+      ...(slug !== undefined ? { slug: String(slug) } : {}),
+      ...(tts_service_id !== undefined ? { tts_service_id: Number(tts_service_id) } : {}),
+    };
+
+    try {
+      const updated = updateFeed(db, id, params);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('UNIQUE constraint failed')) {
+        res.status(409).send('A feed with this slug already exists');
+        return;
+      }
+      logger.error('Failed to update feed', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  app.delete('/api/feeds/:id', (req, res) => {
+    const id = Number(req.params['id']);
+    if (!getFeedById(db, id)) {
+      res.status(404).send('Feed not found');
+      return;
+    }
+
+    const articleCount = countArticlesByFeed(db, id);
+    if (articleCount > 0) {
+      res.status(409).send(`Cannot delete: feed has ${articleCount} article(s). Delete articles first.`);
+      return;
+    }
+
+    deleteFeed(db, id);
+    res.status(204).end();
+  });
+
+  // ── TTS Services API (read-only in Stage 3) ─────────────────────────────────
+
+  app.get('/api/tts-services', (_req, res) => {
+    res.json(getTtsServices(db));
   });
 
   return app;

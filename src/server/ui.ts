@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ejs from 'ejs';
-import type { Article, Feed } from '../db/index.js';
+import type { Article, Feed, TtsService } from '../db/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = readFileSync(join(__dirname, 'templates', 'dashboard.ejs'), 'utf-8');
@@ -42,7 +42,7 @@ function wordCount(content: string | null): string {
   return count + ' w';
 }
 
-export function renderDashboard(articles: Article[], baseUrl: string, feeds: Feed[] = []): string {
+export function renderDashboard(articles: Article[], baseUrl: string, feeds: Feed[] = [], ttsServices: TtsService[] = []): string {
   const counts: Record<string, number> = {
     all: articles.length,
     pending: articles.filter((a) => a.status === 'pending').length,
@@ -60,6 +60,7 @@ export function renderDashboard(articles: Article[], baseUrl: string, feeds: Fee
     baseUrl,
     feeds,
     feedMap,
+    ttsServices,
     STATUS_LABELS,
     formatDate,
     formatElapsed,
