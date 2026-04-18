@@ -67,18 +67,22 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 **Happy path (proper framing):**
 1. Open TCP connection to `PIPER_HOST:PIPER_PORT`.
 2. Send: `{"type":"synthesize","data":{"text":"..."}}\n`
-3. Receive a stream of newline-delimited JSON event frames:
-   - `{"type":"audio-start","data":{"rate":N,"width":N,"channels":N},"payload_length":0}\n` — captures PCM format for WAV header construction.
-   - `{"type":"audio-chunk","data":{...},"payload_length":N}\n` + N raw PCM bytes — the binary payload is consumed directly from the receive buffer (not as text).
-   - `{"type":"audio-stop","data":{},"payload_length":0}\n` — signals completion; WAV file is assembled and written.
+3. Receive a stream of framed events. Each event is three contiguous sections:
+   - JSON header line (`\n`-terminated): `{"type":"...","data_length":N,"payload_length":M}`
+   - Data section: `data_length` bytes of UTF-8 JSON (audio format: rate/width/channels). Present on `audio-start` and `audio-chunk`.
+   - Payload section: `payload_length` bytes of raw binary PCM. Present on `audio-chunk` only.
+
+   Older builds embed format info directly in the header's `data` field instead of a separate data section — both forms are handled.
 4. On `audio-stop`: concatenate all PCM chunks, prepend a 44-byte WAV header built from the `audio-start` format info, write to `outputDir/<filename>`.
 
-**Raw-audio fallback:** Some `wyoming-piper` builds stream raw bytes instead of framed events after the initial JSON headers. When a line fails JSON parsing, the parser switches to raw-collection mode: all subsequent bytes (including the failed line) are accumulated as audio. After `RAW_AUDIO_IDLE_MS` (1 000 ms) of silence the socket is settled. If the collected data starts with `RIFF` it is written as-is; otherwise it is wrapped in a WAV header using the format captured from `audio-start` (or defaults: 22050 Hz, 16-bit, mono).
+**Non-JSON fallback:** When a line in the stream fails JSON parsing, its bytes are pushed directly to `audioChunks` and framing continues. On connection close, any remaining `recvBuf` bytes are also appended before settling. This handles `wyoming-piper` builds that emit raw PCM bytes containing `0x0a`.
 
 **State machine variables** in `synthesise()`:
 - `recvBuf` — binary receive accumulator; never converted to string while a payload is pending.
-- `pendingPayload` — bytes remaining for the current `audio-chunk` binary payload.
-- `rawAudioMode` — flag that bypasses the JSON state machine once non-JSON data is detected.
+- `pendingDataLength` — bytes of UTF-8 JSON data section still to consume for the current event.
+- `pendingPayloadLength` — bytes of raw binary PCM payload still to consume for the current event.
+- `pendingEventType` — event type string of the frame currently being parsed.
+- `pendingDataBuf` — accumulates data-section bytes until fully received, then parsed for audio format.
 - `audioChunks` — collected PCM (or raw audio) buffers assembled at settle time.
 
 **Error paths:** timeout (`TTS_TIMEOUT` seconds), connection refused, empty audio (Piper crash), Wyoming `error` event.
