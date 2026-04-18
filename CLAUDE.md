@@ -57,7 +57,7 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 
 ### Utilities
 
-- `src/utils/env.ts` — typed env accessor functions (call as `env.RSS_URL()`, etc.). Throws on missing required vars.
+- `src/utils/env.ts` — typed env accessor functions (call as `env.RSS_URL()`, etc.). Most vars return a hardcoded default when unset; `RSS_URL` and `POLL_INTERVAL` return `undefined`. `MAX_AUDIO_FILES` and `MAX_AUDIO_SIZE_MB` throw only when set to a non-numeric or negative value.
 - `src/utils/logger.ts` — structured JSON logger wrapping `console`.
 
 ### Wyoming protocol
