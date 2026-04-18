@@ -122,11 +122,6 @@ export function getDoneArticlesOrderedByDateByFeed(db: Db, feedId: number) {
     .all();
 }
 
-export function countDoneArticles(db: Db): number {
-  const result = db.select({ count: count() }).from(articles).where(eq(articles.status, 'done')).get();
-  return result?.count ?? 0;
-}
-
 export function countArticlesByFeed(db: Db, feedId: number): number {
   const result = db.select({ count: count() }).from(articles).where(eq(articles.feed_id, feedId)).get();
   return result?.count ?? 0;
