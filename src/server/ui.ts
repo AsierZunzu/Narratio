@@ -42,6 +42,13 @@ function wordCount(content: string | null): string {
   return count + ' w';
 }
 
+function wordCountNum(content: string | null): number {
+  if (!content || content.trim() === '') return -1;
+  const text = stripHtml(content).trim();
+  if (!text) return -1;
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 export function renderDashboard(articles: Article[], baseUrl: string, feeds: Feed[] = [], ttsServices: TtsService[] = []): string {
   const counts: Record<string, number> = {
     all: articles.length,
@@ -65,5 +72,6 @@ export function renderDashboard(articles: Article[], baseUrl: string, feeds: Fee
     formatDate,
     formatElapsed,
     wordCount,
+    wordCountNum,
   });
 }
