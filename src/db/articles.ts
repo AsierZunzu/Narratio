@@ -49,7 +49,7 @@ export function markArticleFailed(db: Db, guid: string, error: string): void {
 
 export function markArticlePermanentlyFailed(db: Db, guid: string, error: string): void {
   db.update(articles)
-    .set({ status: 'failed', tts_retries: sql`${articles.tts_retries} + 1`, error })
+    .set({ status: 'failed', tts_retries: 9999, error })
     .where(eq(articles.guid, guid))
     .run();
 }
