@@ -36,6 +36,8 @@
     .empty { color: #475569; padding: 24px; text-align: center; }
 
     .col-title { max-width: 340px; word-break: break-word; }
+    .col-feed { white-space: nowrap; font-size: 12px; }
+    .col-feed a { color: #60a5fa; }
     .col-words { white-space: nowrap; color: #64748b; font-variant-numeric: tabular-nums; }
     .col-tts-time { white-space: nowrap; color: #64748b; font-variant-numeric: tabular-nums; }
     .col-retries { white-space: nowrap; color: #94a3b8; }
@@ -143,6 +145,7 @@
         <thead>
           <tr>
             <th>Title</th>
+            <th>Feed</th>
             <th>Status</th>
             <th>Date</th>
             <th>Words</th>
@@ -154,15 +157,23 @@
         </thead>
         <tbody id="articles-body">
           <% if (articles.length === 0) { %>
-            <tr><td colspan="8" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>
+            <tr><td colspan="9" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>
           <% } else { %>
             <% articles.forEach(function(a) { %>
-              <tr data-guid="<%= a.guid %>" data-status="<%= a.status %>" data-content="<%= a.content || '' %>">
+              <% var articleFeed = a.feed_id ? feedMap[a.feed_id] : null; %>
+              <tr data-guid="<%= a.guid %>" data-status="<%= a.status %>" data-feed-id="<%= a.feed_id || '' %>" data-content="<%= a.content || '' %>">
                 <td class="col-title">
                   <% if (a.content) { %>
                     <button class="btn-view-content" data-guid="<%= a.guid %>" title="View content"><%= a.title %></button>
                   <% } else { %>
                     <%= a.title %>
+                  <% } %>
+                </td>
+                <td class="col-feed">
+                  <% if (articleFeed) { %>
+                    <a href="<%= baseUrl %>/rss/<%= articleFeed.slug %>" target="_blank" rel="noopener" title="<%= articleFeed.rss_url %>"><%= articleFeed.name %></a>
+                  <% } else { %>
+                    <span style="color:#475569">—</span>
                   <% } %>
                 </td>
                 <td class="col-status"><span class="badge badge-<%= a.status %>"><%= STATUS_LABELS[a.status] || a.status %></span></td>
@@ -437,6 +448,7 @@
   <script>
     const BASE_URL = '<%= baseUrl %>';
     const STATUS_LABELS = { pending: 'Pending', converting: 'Converting', done: 'Done', failed: 'Failed', purged: 'Purged' };
+    const FEED_MAP = <%- JSON.stringify(feedMap) %>;
 
     function escAttr(s) {
       return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -834,6 +846,12 @@
       });
     }
 
+    function buildFeedCell(feedId) {
+      const feed = feedId ? FEED_MAP[feedId] : null;
+      if (!feed) return '<span style="color:#475569">—</span>';
+      return `<a href="${BASE_URL}/rss/${escAttr(feed.slug)}" target="_blank" rel="noopener" title="${escAttr(feed.rss_url)}">${escHtml(feed.name)}</a>`;
+    }
+
     function buildRow(a) {
       const label = STATUS_LABELS[a.status] || a.status;
       const content = a.content || '';
@@ -855,8 +873,9 @@
       if (a.status === 'done' && a.audio_file) actions += `<a class="btn btn-audio" href="${BASE_URL}/audio/${encodeURIComponent(a.audio_file)}">▶ Audio</a> `;
       actions += `<button class="btn btn-delete" data-action="delete" data-guid="${escAttr(a.guid)}">Delete</button>`;
 
-      return `<tr data-guid="${escAttr(a.guid)}" data-status="${escAttr(a.status)}" data-content="${escAttr(content)}">
+      return `<tr data-guid="${escAttr(a.guid)}" data-status="${escAttr(a.status)}" data-feed-id="${escAttr(a.feed_id ?? '')}" data-content="${escAttr(content)}">
         <td class="col-title">${titleCell}</td>
+        <td class="col-feed">${buildFeedCell(a.feed_id)}</td>
         <td class="col-status"><span class="badge badge-${escAttr(a.status)}">${escAttr(label)}</span></td>
         <td class="col-date">${clientFormatDate(a.pub_date)}</td>
         <td class="col-words">${clientWordCount(a.content)}</td>
@@ -933,7 +952,7 @@
       }
 
       if (tbody.querySelectorAll('tr[data-guid]').length === 0 && !tbody.querySelector('.empty')) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty">No articles yet. The worker will populate this table after the first RSS poll.</td></tr>';
       }
 
       if (changed) { recalcCounts(); applyFilter(); }
