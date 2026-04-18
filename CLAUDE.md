@@ -51,7 +51,7 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 
 ### Server
 
-`src/server/feed.ts` — builds the podcast XML using the `podcast` npm package. Purged articles use `unavailable.wav`; permanently-failed articles use `tts-failed.wav`. Both fallback WAVs are generated on server startup via TTS.
+`src/server/feed.ts` — builds the podcast XML using the `podcast` npm package. Purged articles use `unavailable-${feed.id}.wav`; permanently-failed articles use `tts-failed-${feed.id}.wav`. Both fallback WAVs are generated per-feed on server startup via TTS.
 
 `src/server/ui.ts` — serves an EJS-rendered admin/status page. Templates live in `src/server/templates/` and must be copied to `dist/server/templates/` at build time (handled by the build script).
 
