@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../src/db/schema.js';
+import { TEST_SCHEMA_SQL as SCHEMA_SQL } from '../helpers/schema.js';
 import net from 'net';
 import os from 'os';
 import fs from 'fs';
@@ -9,24 +10,6 @@ import path from 'path';
 import { processFeed } from '../../src/services/rss.js';
 import { getArticleByGuid, getPublishedArticles } from '../../src/db/articles.js';
 import type { Db } from '../../src/db/index.js';
-
-const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS articles (
-  guid TEXT PRIMARY KEY,
-  feed_url TEXT NOT NULL,
-  title TEXT NOT NULL,
-  link TEXT,
-  pub_date TEXT,
-  content TEXT,
-  image_url TEXT,
-  audio_file TEXT,
-  status TEXT NOT NULL DEFAULT 'pending',
-  tts_retries INTEGER NOT NULL DEFAULT 0,
-  tts_elapsed_ms INTEGER,
-  error TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-`;
 
 function makeDb(): Db {
   const sqlite = new Database(':memory:');
