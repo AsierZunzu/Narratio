@@ -1,43 +1,35 @@
 import { Podcast } from 'podcast';
-import type { Db } from '../db/index.js';
-import { getPublishedArticles } from '../db/articles.js';
-import { env } from '../utils/env.js';
-
-export interface FeedConfig {
-  baseUrl: string;
-}
+import type { Db, Feed } from '../db/index.js';
+import { getPublishedArticlesByFeed } from '../db/articles.js';
 
 const PURGED_PREFIX = '[PURGED]';
 const TTS_FAILED_PREFIX = '[TTS FAILED]';
 
-export function buildFeedXml(db: Db, config: FeedConfig): string {
-  const title = env.PODCAST_TITLE();
-  const description = env.PODCAST_DESCRIPTION() || `Narratio: ${title}`;
-  const author = env.PODCAST_AUTHOR();
-  const language = env.PODCAST_LANGUAGE();
+export function buildFeedXml(db: Db, feed: Feed, baseUrl: string): string {
+  const description = feed.description || `Narratio: ${feed.title}`;
 
-  const feed = new Podcast({
-    title,
+  const podcast = new Podcast({
+    title: feed.title,
     description,
-    feedUrl: `${config.baseUrl}/rss`,
-    siteUrl: config.baseUrl,
-    author,
-    language,
+    feedUrl: `${baseUrl}/rss/${feed.slug}`,
+    siteUrl: baseUrl,
+    author: feed.author,
+    language: feed.language,
     generator: 'Narratio',
     customNamespaces: {},
     customElements: [],
     namespaces: { iTunes: true },
-    itunesAuthor: env.PODCAST_ITUNES_AUTHOR(),
-    itunesSummary: env.PODCAST_ITUNES_SUMMARY() || description,
+    itunesAuthor: feed.itunes_author ?? feed.author,
+    itunesSummary: feed.itunes_summary ?? description,
     itunesOwner: {
-      name: env.PODCAST_ITUNES_OWNER_NAME(),
-      email: env.PODCAST_ITUNES_OWNER_EMAIL(),
+      name: feed.itunes_owner_name ?? feed.author,
+      email: feed.itunes_owner_email ?? 'worker@example.com',
     },
-    itunesCategory: [{ text: env.PODCAST_ITUNES_CATEGORY() }],
+    itunesCategory: [{ text: feed.itunes_category }],
     itunesExplicit: false,
   });
 
-  const articles = getPublishedArticles(db);
+  const articles = getPublishedArticlesByFeed(db, feed.id);
 
   for (const article of articles) {
     let itemTitle = article.title;
@@ -53,12 +45,12 @@ export function buildFeedXml(db: Db, config: FeedConfig): string {
       audioFile = article.audio_file!;
     }
 
-    const audioUrl = `${config.baseUrl}/audio/${encodeURIComponent(audioFile)}`;
+    const audioUrl = `${baseUrl}/audio/${encodeURIComponent(audioFile)}`;
 
-    feed.addItem({
+    podcast.addItem({
       title: itemTitle,
       description: article.content ?? article.title,
-      url: article.link ?? config.baseUrl,
+      url: article.link ?? baseUrl,
       guid: article.guid,
       date: article.pub_date ?? article.created_at,
       imageUrl: article.image_url ?? undefined,
@@ -69,5 +61,5 @@ export function buildFeedXml(db: Db, config: FeedConfig): string {
     });
   }
 
-  return feed.buildXml({ indent: '  ' });
+  return podcast.buildXml({ indent: '  ' });
 }

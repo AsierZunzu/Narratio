@@ -69,6 +69,7 @@ describe('processFeed', () => {
   let tmpDir: string;
 
   const baseOpts = () => ({
+    feedId: 1,
     feedUrl: 'https://example.com/feed',
     fetchTimeoutMs: 5000,
     maxRetries: 3,

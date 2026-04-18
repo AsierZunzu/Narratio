@@ -1,27 +1,24 @@
 import fs from 'fs';
 import path from 'path';
 import type { Db } from '../db/index.js';
-import { getDoneArticlesOrderedByDate, markArticlePurged } from '../db/articles.js';
+import { getDoneArticlesOrderedByDate, getDoneArticlesOrderedByDateByFeed, markArticlePurged } from '../db/articles.js';
 import { logger } from '../utils/logger.js';
 
 export interface CleanupOptions {
+  feedId?: number;
   maxAudioFiles: number;
   maxAudioSizeMb: number;
   audioDir: string;
 }
 
-/**
- * Enforces audio storage quotas after each RSS poll.
- *
- * Deletes the oldest WAV files first (by pub_date ASC, then created_at ASC)
- * until both quotas are satisfied. Deleted articles are marked as 'purged'
- * in the DB so they remain visible in the podcast feed with fallback audio.
- */
 export function runCleanup(db: Db, opts: CleanupOptions): void {
-  const { maxAudioFiles, maxAudioSizeMb, audioDir } = opts;
+  const { feedId, maxAudioFiles, maxAudioSizeMb, audioDir } = opts;
   if (maxAudioFiles === Infinity && maxAudioSizeMb === Infinity) return;
 
-  const articles = getDoneArticlesOrderedByDate(db);
+  const articles = feedId !== undefined
+    ? getDoneArticlesOrderedByDateByFeed(db, feedId)
+    : getDoneArticlesOrderedByDate(db);
+
   let fileCount = articles.length;
   let totalBytes = articles.reduce((sum, a) => {
     if (!a.audio_file) return sum;

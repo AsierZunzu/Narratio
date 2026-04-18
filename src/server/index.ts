@@ -6,6 +6,8 @@ import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
 import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid } from '../db/articles.js';
+import { getFeeds, getFeedBySlug } from '../db/feeds.js';
+import { getTtsServices, getTtsServiceById } from '../db/tts-services.js';
 import { synthesise } from '../services/tts.js';
 import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
@@ -14,12 +16,19 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 
-async function ensureFallbackAudio(): Promise<void> {
+async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
+  const ttsServicesList = getTtsServices(db);
+  if (ttsServicesList.length === 0) {
+    logger.warn('No TTS services configured — skipping fallback audio generation');
+    return;
+  }
+  const ttsService = ttsServicesList[0]!;
+
   const ttsOpts = {
-    host: env.PIPER_HOST(),
-    port: env.PIPER_PORT(),
+    host: ttsService.host,
+    port: ttsService.port,
     timeoutMs: env.TTS_TIMEOUT(),
     outputDir: AUDIO_DIR,
   };
@@ -46,8 +55,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
   const app = express();
   const db = getDb(dbPath);
 
-  const port = env.PORT();
-  const baseUrl = process.env['BASE_URL'] ?? `http://localhost:${port}`;
+  app.use(express.json());
 
   app.get('/audio/:file', (req, res) => {
     const filename = req.params['file'];
@@ -64,9 +72,20 @@ export function createApp(dbPath = DB_PATH): express.Application {
     res.sendFile(filePath);
   });
 
-  app.get('/rss', (_req, res) => {
+  app.get('/rss/:slug', (req, res) => {
+    const baseUrl = process.env['BASE_URL'] ?? `${req.protocol}://${req.get('host')}`;
     try {
-      const xml = buildFeedXml(db, { baseUrl });
+      const feed = getFeedBySlug(db, req.params['slug']!);
+      if (!feed) {
+        res.status(404).send('Feed not found');
+        return;
+      }
+      const ttsService = getTtsServiceById(db, feed.tts_service_id);
+      if (!ttsService) {
+        res.status(500).send('TTS service not configured');
+        return;
+      }
+      const xml = buildFeedXml(db, feed, baseUrl);
       res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
       res.send(xml);
     } catch (err) {
@@ -77,10 +96,12 @@ export function createApp(dbPath = DB_PATH): express.Application {
 
   // ── Dashboard UI ────────────────────────────────────────────────────────────
 
-  app.get('/', (_req, res) => {
+  app.get('/', (req, res) => {
+    const baseUrl = process.env['BASE_URL'] ?? `${req.protocol}://${req.get('host')}`;
     try {
       const articles = getAllArticles(db);
-      const html = renderDashboard(articles, baseUrl);
+      const feeds = getFeeds(db);
+      const html = renderDashboard(articles, baseUrl, feeds);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } catch (err) {
@@ -146,6 +167,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
 
 async function main(): Promise<void> {
   const app = createApp();
+  const db = getDb(DB_PATH);
   const port = env.PORT();
 
   const baseUrl = process.env['BASE_URL'] ?? `http://localhost:${port}`;
@@ -153,10 +175,16 @@ async function main(): Promise<void> {
   const server = app.listen(port, () => {
     logger.info('Narratio server is ready');
     logger.info(`  Dashboard : ${baseUrl}/`);
-    logger.info(`  RSS feed  : ${baseUrl}/rss`);
     logger.info(`  API       : ${baseUrl}/api/articles`);
-    // Generate fallback audio in the background — don't block startup
-    ensureFallbackAudio().catch((err) =>
+    const feeds = getFeeds(db);
+    if (feeds.length === 0) {
+      logger.info('  RSS feeds : (none configured)');
+    } else {
+      for (const feed of feeds) {
+        logger.info(`  RSS feed  : ${baseUrl}/rss/${feed.slug} (${feed.name})`);
+      }
+    }
+    ensureFallbackAudio(db).catch((err) =>
       logger.warn(`Fallback audio generation failed: ${err instanceof Error ? err.message : String(err)}`),
     );
   });

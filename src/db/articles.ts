@@ -73,9 +73,23 @@ export function getPendingArticles(db: Db) {
   return db.select().from(articles).where(eq(articles.status, 'pending')).orderBy(asc(articles.created_at)).all();
 }
 
+export function getPendingArticlesByFeed(db: Db, feedId: number) {
+  return db.select().from(articles)
+    .where(and(eq(articles.status, 'pending'), eq(articles.feed_id, feedId)))
+    .orderBy(asc(articles.created_at))
+    .all();
+}
+
 export function getRetryableArticles(db: Db, maxRetries: number) {
   return db.select().from(articles)
     .where(and(eq(articles.status, 'failed'), lt(articles.tts_retries, maxRetries)))
+    .orderBy(asc(articles.created_at))
+    .all();
+}
+
+export function getRetryableArticlesByFeed(db: Db, feedId: number, maxRetries: number) {
+  return db.select().from(articles)
+    .where(and(eq(articles.status, 'failed'), lt(articles.tts_retries, maxRetries), eq(articles.feed_id, feedId)))
     .orderBy(asc(articles.created_at))
     .all();
 }
@@ -87,9 +101,23 @@ export function getPublishedArticles(db: Db) {
     .all();
 }
 
+export function getPublishedArticlesByFeed(db: Db, feedId: number) {
+  return db.select().from(articles)
+    .where(and(inArray(articles.status, ['done', 'purged', 'failed']), eq(articles.feed_id, feedId)))
+    .orderBy(desc(articles.pub_date), desc(articles.created_at))
+    .all();
+}
+
 export function getDoneArticlesOrderedByDate(db: Db) {
   return db.select().from(articles)
     .where(eq(articles.status, 'done'))
+    .orderBy(asc(articles.pub_date), asc(articles.created_at))
+    .all();
+}
+
+export function getDoneArticlesOrderedByDateByFeed(db: Db, feedId: number) {
+  return db.select().from(articles)
+    .where(and(eq(articles.status, 'done'), eq(articles.feed_id, feedId)))
     .orderBy(asc(articles.pub_date), asc(articles.created_at))
     .all();
 }
