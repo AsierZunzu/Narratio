@@ -75,7 +75,7 @@ describe('buildFeedXml', () => {
 
     const xml = buildFeedXml(db, feed, BASE_URL);
     expect(xml).toContain('[PURGED] Gone');
-    expect(xml).toContain(`${BASE_URL}/audio/unavailable.wav`);
+    expect(xml).toContain(`${BASE_URL}/audio/unavailable-${feed.id}.wav`);
   });
 
   it('prefixes TTS-failed articles with [TTS FAILED]', () => {
@@ -85,7 +85,7 @@ describe('buildFeedXml', () => {
 
     const xml = buildFeedXml(db, feed, BASE_URL);
     expect(xml).toContain('[TTS FAILED] Broken');
-    expect(xml).toContain(`${BASE_URL}/audio/tts-failed.wav`);
+    expect(xml).toContain(`${BASE_URL}/audio/tts-failed-${feed.id}.wav`);
   });
 
   it('excludes articles from other feeds', () => {

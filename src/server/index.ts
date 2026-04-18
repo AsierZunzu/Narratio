@@ -6,8 +6,8 @@ import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
 import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, countArticlesByFeed } from '../db/articles.js';
-import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeed } from '../db/feeds.js';
-import { getTtsServices, getTtsServiceById } from '../db/tts-services.js';
+import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeed, countFeedsByTtsService } from '../db/feeds.js';
+import { getTtsServices, getTtsServiceById, insertTtsService, updateTtsService, deleteTtsService } from '../db/tts-services.js';
 import { synthesise } from '../services/tts.js';
 import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
@@ -16,28 +16,20 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 
-async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> {
+async function ensureFeedFallbackAudio(
+  db: ReturnType<typeof getDb>,
+  feedId: number,
+  ttsHost: string,
+  ttsPort: number,
+  unavailableText: string,
+  ttsFailedText: string,
+): Promise<void> {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
-
-  const ttsServicesList = getTtsServices(db);
-  if (ttsServicesList.length === 0) {
-    logger.warn('No TTS services configured — skipping fallback audio generation');
-    return;
-  }
-  const ttsService = ttsServicesList[0]!;
-
-  const ttsOpts = {
-    host: ttsService.host,
-    port: ttsService.port,
-    timeoutMs: env.TTS_TIMEOUT(),
-    outputDir: AUDIO_DIR,
-  };
-
+  const ttsOpts = { host: ttsHost, port: ttsPort, timeoutMs: env.TTS_TIMEOUT(), outputDir: AUDIO_DIR };
   const fallbacks = [
-    { filename: 'unavailable.wav', text: env.UNAVAILABLE_MESSAGE() },
-    { filename: 'tts-failed.wav', text: env.TTS_FAILED_MESSAGE() },
+    { filename: `unavailable-${feedId}.wav`, text: unavailableText },
+    { filename: `tts-failed-${feedId}.wav`, text: ttsFailedText },
   ];
-
   for (const { filename, text } of fallbacks) {
     const filePath = path.join(AUDIO_DIR, filename);
     if (!fs.existsSync(filePath)) {
@@ -48,6 +40,23 @@ async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> 
         logger.warn(`Could not generate fallback audio ${filename}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
+  }
+}
+
+async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> {
+  fs.mkdirSync(AUDIO_DIR, { recursive: true });
+  const feedsList = getFeeds(db);
+  for (const feed of feedsList) {
+    const ttsService = getTtsServiceById(db, feed.tts_service_id);
+    if (!ttsService) continue;
+    await ensureFeedFallbackAudio(
+      db,
+      feed.id,
+      ttsService.host,
+      ttsService.port,
+      feed.unavailable_message ?? env.UNAVAILABLE_MESSAGE(),
+      feed.tts_failed_message ?? env.TTS_FAILED_MESSAGE(),
+    );
   }
 }
 
@@ -85,6 +94,11 @@ export function createApp(dbPath = DB_PATH): express.Application {
         res.status(500).send('TTS service not configured');
         return;
       }
+      ensureFeedFallbackAudio(
+        db, feed.id, ttsService.host, ttsService.port,
+        feed.unavailable_message ?? env.UNAVAILABLE_MESSAGE(),
+        feed.tts_failed_message ?? env.TTS_FAILED_MESSAGE(),
+      ).catch((err) => logger.warn(`Lazy fallback audio failed: ${err instanceof Error ? err.message : String(err)}`));
       const xml = buildFeedXml(db, feed, baseUrl);
       res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
       res.send(xml);
@@ -256,10 +270,72 @@ export function createApp(dbPath = DB_PATH): express.Application {
     res.status(204).end();
   });
 
-  // ── TTS Services API (read-only in Stage 3) ─────────────────────────────────
+  // ── TTS Services API ─────────────────────────────────────────────────────────
 
   app.get('/api/tts-services', (_req, res) => {
     res.json(getTtsServices(db));
+  });
+
+  app.post('/api/tts-services', (req, res) => {
+    const { name, host, port } = req.body ?? {};
+    if (!name || !host || port == null) {
+      res.status(400).send('Missing required fields: name, host, port');
+      return;
+    }
+    const portNum = Number(port);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+      res.status(400).send('port must be an integer between 1 and 65535');
+      return;
+    }
+    try {
+      const svc = insertTtsService(db, { name: String(name), host: String(host), port: portNum });
+      res.status(201).json(svc);
+    } catch (err) {
+      logger.error('Failed to create TTS service', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  app.put('/api/tts-services/:id', (req, res) => {
+    const id = Number(req.params['id']);
+    if (!getTtsServiceById(db, id)) {
+      res.status(404).send('TTS service not found');
+      return;
+    }
+    const { name, host, port } = req.body ?? {};
+    const params: { name?: string; host?: string; port?: number } = {};
+    if (name !== undefined) params.name = String(name);
+    if (host !== undefined) params.host = String(host);
+    if (port !== undefined) {
+      const portNum = Number(port);
+      if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+        res.status(400).send('port must be an integer between 1 and 65535');
+        return;
+      }
+      params.port = portNum;
+    }
+    try {
+      const updated = updateTtsService(db, id, params);
+      res.json(updated);
+    } catch (err) {
+      logger.error('Failed to update TTS service', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  app.delete('/api/tts-services/:id', (req, res) => {
+    const id = Number(req.params['id']);
+    if (!getTtsServiceById(db, id)) {
+      res.status(404).send('TTS service not found');
+      return;
+    }
+    const feedCount = countFeedsByTtsService(db, id);
+    if (feedCount > 0) {
+      res.status(409).send(`Cannot delete: ${feedCount} feed(s) use this TTS service. Reassign them first.`);
+      return;
+    }
+    deleteTtsService(db, id);
+    res.status(204).end();
   });
 
   return app;

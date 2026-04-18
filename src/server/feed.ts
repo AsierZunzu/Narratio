@@ -37,10 +37,10 @@ export function buildFeedXml(db: Db, feed: Feed, baseUrl: string): string {
 
     if (article.status === 'purged') {
       itemTitle = `${PURGED_PREFIX} ${article.title}`;
-      audioFile = 'unavailable.wav';
+      audioFile = `unavailable-${feed.id}.wav`;
     } else if (article.status === 'failed') {
       itemTitle = `${TTS_FAILED_PREFIX} ${article.title}`;
-      audioFile = 'tts-failed.wav';
+      audioFile = `tts-failed-${feed.id}.wav`;
     } else {
       audioFile = article.audio_file!;
     }

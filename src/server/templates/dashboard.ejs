@@ -74,8 +74,8 @@
     .btn-view-content { background: none; border: none; cursor: pointer; color: inherit; font: inherit; text-align: left; padding: 0; width: 100%; }
     .btn-view-content:hover a, .btn-view-content:hover { color: #93c5fd; }
 
-    #content-modal, #feed-modal { display: none; position: fixed; inset: 0; z-index: 200; }
-    #content-modal.open, #feed-modal.open { display: flex; align-items: flex-end; justify-content: center; }
+    #content-modal, #feed-modal, #tts-modal { display: none; position: fixed; inset: 0; z-index: 200; }
+    #content-modal.open, #feed-modal.open, #tts-modal.open { display: flex; align-items: flex-end; justify-content: center; }
     #content-backdrop, .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
     #content-panel { position: relative; background: #1a1f2e; border: 1px solid #252d3f; border-radius: 12px 12px 0 0; width: 100%; max-width: 860px; max-height: 70vh; display: flex; flex-direction: column; }
     #content-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #252d3f; gap: 12px; }
@@ -107,6 +107,8 @@
     .feeds-header h2 { font-size: 15px; font-weight: 600; }
     .feed-url { font-size: 12px; color: #60a5fa; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .quota-cell { font-size: 12px; color: #64748b; }
+    .btn-warning { background: #422006; color: #fdba74; }
+    .btn-warning:hover { background: #c2410c; }
   </style>
 </head>
 <body>
@@ -115,6 +117,7 @@
     <div class="main-nav">
       <button class="nav-btn active" id="nav-articles">Articles</button>
       <button class="nav-btn" id="nav-feeds">Feeds <span class="tab-count"><%= feeds.length %></span></button>
+      <button class="nav-btn" id="nav-tts">TTS Services <span class="tab-count"><%= ttsServices.length %></span></button>
     </div>
   </header>
 
@@ -237,6 +240,77 @@
           <% } %>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ── TTS Services View ─────────────────────────────────────────────────── -->
+  <div id="tts-view" style="display:none">
+    <div class="feeds-header">
+      <h2>TTS Services</h2>
+      <button class="btn btn-primary" id="add-tts-btn">+ Add TTS Service</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Host</th>
+            <th>Port</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tts-body">
+          <% if (ttsServices.length === 0) { %>
+            <tr><td colspan="4" class="empty">No TTS services configured. Click "+ Add TTS Service" to get started.</td></tr>
+          <% } else { %>
+            <% ttsServices.forEach(function(svc) { %>
+              <tr data-tts-id="<%= svc.id %>">
+                <td><strong><%= svc.name %></strong></td>
+                <td><%= svc.host %></td>
+                <td><%= svc.port %></td>
+                <td>
+                  <button class="btn btn-edit" data-tts-edit="<%= svc.id %>">Edit</button>
+                  <button class="btn btn-delete" data-tts-delete="<%= svc.id %>">Delete</button>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TTS Modal ─────────────────────────────────────────────────────────── -->
+  <div id="tts-modal">
+    <div class="modal-backdrop" id="tts-modal-backdrop"></div>
+    <div class="modal-panel" style="max-width:480px">
+      <div class="modal-header">
+        <span id="tts-modal-title">Add TTS Service</span>
+        <button class="modal-close" id="tts-modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="tts-form" autocomplete="off">
+          <input type="hidden" id="tts-id" value="">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label for="t-name">Name <span style="color:#ef4444">*</span></label>
+              <input id="t-name" name="name" required placeholder="Default Piper">
+            </div>
+            <div class="form-field">
+              <label for="t-host">Host <span style="color:#ef4444">*</span></label>
+              <input id="t-host" name="host" required placeholder="localhost">
+            </div>
+            <div class="form-field">
+              <label for="t-port">Port <span style="color:#ef4444">*</span></label>
+              <input id="t-port" name="port" type="number" required min="1" max="65535" placeholder="10200">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-link" id="tts-form-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="tts-form-submit">Save</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -397,26 +471,148 @@
     // ── View switching ────────────────────────────────────────────────────────
     const navArticles = document.getElementById('nav-articles');
     const navFeeds = document.getElementById('nav-feeds');
+    const navTts = document.getElementById('nav-tts');
     const articlesView = document.getElementById('articles-view');
     const feedsView = document.getElementById('feeds-view');
+    const ttsView = document.getElementById('tts-view');
 
     function showView(view) {
+      articlesView.style.display = 'none';
+      feedsView.style.display = 'none';
+      ttsView.style.display = 'none';
+      navArticles.classList.remove('active');
+      navFeeds.classList.remove('active');
+      navTts.classList.remove('active');
       if (view === 'feeds') {
-        articlesView.style.display = 'none';
         feedsView.style.display = '';
-        navArticles.classList.remove('active');
         navFeeds.classList.add('active');
         refreshFeedsTable();
+      } else if (view === 'tts') {
+        ttsView.style.display = '';
+        navTts.classList.add('active');
+        refreshTtsTable();
       } else {
-        feedsView.style.display = 'none';
         articlesView.style.display = '';
-        navFeeds.classList.remove('active');
         navArticles.classList.add('active');
       }
     }
 
     navArticles.addEventListener('click', () => showView('articles'));
     navFeeds.addEventListener('click', () => showView('feeds'));
+    navTts.addEventListener('click', () => showView('tts'));
+
+    // ── TTS Services table ────────────────────────────────────────────────────
+    async function refreshTtsTable() {
+      try {
+        const res = await fetch('/api/tts-services');
+        if (!res.ok) return;
+        const services = await res.json();
+        const tbody = document.getElementById('tts-body');
+        navTts.querySelector('.tab-count').textContent = services.length;
+        if (services.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="empty">No TTS services configured. Click "+ Add TTS Service" to get started.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = services.map(s =>
+          `<tr data-tts-id="${escAttr(s.id)}">
+            <td><strong>${escHtml(s.name)}</strong></td>
+            <td>${escHtml(s.host)}</td>
+            <td>${escHtml(String(s.port))}</td>
+            <td>
+              <button class="btn btn-edit" data-tts-edit="${escAttr(s.id)}">Edit</button>
+              <button class="btn btn-delete" data-tts-delete="${escAttr(s.id)}">Delete</button>
+            </td>
+          </tr>`
+        ).join('');
+      } catch { /* silent */ }
+    }
+
+    // ── TTS modal ─────────────────────────────────────────────────────────────
+    const ttsModal = document.getElementById('tts-modal');
+    const ttsForm = document.getElementById('tts-form');
+    const ttsIdInput = document.getElementById('tts-id');
+
+    function openTtsModal(svc) {
+      ttsForm.reset();
+      if (svc) {
+        document.getElementById('tts-modal-title').textContent = 'Edit TTS Service';
+        ttsIdInput.value = svc.id;
+        ttsForm.elements['name'].value = svc.name || '';
+        ttsForm.elements['host'].value = svc.host || '';
+        ttsForm.elements['port'].value = svc.port || '';
+      } else {
+        document.getElementById('tts-modal-title').textContent = 'Add TTS Service';
+        ttsIdInput.value = '';
+      }
+      ttsModal.classList.add('open');
+    }
+
+    function closeTtsModal() { ttsModal.classList.remove('open'); }
+
+    document.getElementById('tts-modal-close').addEventListener('click', closeTtsModal);
+    document.getElementById('tts-form-cancel').addEventListener('click', closeTtsModal);
+    document.getElementById('tts-modal-backdrop').addEventListener('click', closeTtsModal);
+    document.getElementById('add-tts-btn').addEventListener('click', () => openTtsModal(null));
+
+    ttsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = ttsIdInput.value;
+      const data = Object.fromEntries(new FormData(ttsForm).entries());
+      data['port'] = Number(data['port']);
+      const submitBtn = document.getElementById('tts-form-submit');
+      submitBtn.disabled = true;
+      try {
+        const url = id ? '/api/tts-services/' + encodeURIComponent(id) : '/api/tts-services';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (res.ok) {
+          showToast(id ? 'TTS service updated' : 'TTS service created', false);
+          closeTtsModal();
+          refreshTtsTable();
+        } else {
+          showToast(await res.text(), true);
+        }
+      } catch {
+        showToast('Network error', true);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('tts-body').addEventListener('click', async (e) => {
+      const editBtn = e.target.closest('[data-tts-edit]');
+      const deleteBtn = e.target.closest('[data-tts-delete]');
+
+      if (editBtn) {
+        const id = editBtn.dataset.ttsEdit;
+        try {
+          const res = await fetch('/api/tts-services');
+          const services = await res.json();
+          const svc = services.find(s => String(s.id) === String(id));
+          if (svc) openTtsModal(svc);
+        } catch { showToast('Failed to load TTS service data', true); }
+        return;
+      }
+
+      if (deleteBtn) {
+        const id = deleteBtn.dataset.ttsDelete;
+        if (!confirm('Delete this TTS service? This cannot be undone.')) return;
+        deleteBtn.disabled = true;
+        try {
+          const res = await fetch('/api/tts-services/' + encodeURIComponent(id), { method: 'DELETE' });
+          if (res.ok) {
+            showToast('TTS service deleted', false);
+            refreshTtsTable();
+          } else {
+            showToast(await res.text(), true);
+            deleteBtn.disabled = false;
+          }
+        } catch {
+          showToast('Network error', true);
+          deleteBtn.disabled = false;
+        }
+      }
+    });
 
     // ── Feeds table ───────────────────────────────────────────────────────────
     async function refreshFeedsTable() {
@@ -469,8 +665,21 @@
       slugPreview.textContent = BASE_URL + '/rss/' + (slugInput.value || '…');
     });
 
+    async function refreshTtsDropdown(selectedId) {
+      try {
+        const res = await fetch('/api/tts-services');
+        if (!res.ok) return;
+        const services = await res.json();
+        const sel = document.getElementById('f-tts');
+        sel.innerHTML = services.length === 0
+          ? '<option value="" disabled>No TTS services configured</option>'
+          : services.map(s => `<option value="${escAttr(s.id)}"${String(s.id) === String(selectedId) ? ' selected' : ''}>${escHtml(s.name)} (${escHtml(s.host)}:${escHtml(String(s.port))})</option>`).join('');
+      } catch { /* silent */ }
+    }
+
     function openFeedModal(feed) {
       feedForm.reset();
+      refreshTtsDropdown(feed ? feed.tts_service_id : null);
       if (feed) {
         feedModalTitle.textContent = 'Edit Feed';
         feedIdInput.value = feed.id;
@@ -767,6 +976,7 @@
       if (e.key === 'Escape') {
         closeContentPanel();
         closeFeedModal();
+        closeTtsModal();
       }
     });
 
