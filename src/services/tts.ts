@@ -258,6 +258,65 @@ export async function synthesise(
   });
 }
 
+export interface TtsServiceInfo {
+  voice: string;
+  languages: string[];
+}
+
+export async function discoverService(host: string, port: number): Promise<TtsServiceInfo | null> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    let recvBuf = Buffer.alloc(0);
+
+    const done = (result: TtsServiceInfo | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      socket.destroy();
+      resolve(result);
+    };
+
+    const timeout = setTimeout(() => {
+      logger.warn(`TTS discover timeout for ${host}:${port}`);
+      done(null);
+    }, 10_000);
+
+    socket.setNoDelay(true);
+    socket.connect(port, host, () => {
+      socket.write(JSON.stringify({ type: 'describe' }) + '\n');
+    });
+
+    socket.on('data', (chunk: Buffer) => {
+      if (settled) return;
+      recvBuf = Buffer.concat([recvBuf, chunk]);
+      const nlIdx = recvBuf.indexOf(0x0a);
+      if (nlIdx === -1) return;
+      const line = recvBuf.subarray(0, nlIdx).toString('utf8').trim();
+      try {
+        const event = JSON.parse(line) as Record<string, unknown>;
+        if (event['type'] !== 'info') return;
+        const data = event['data'] as Record<string, unknown> | undefined;
+        const tts = (data?.['tts'] as unknown[] | undefined)?.[0] as Record<string, unknown> | undefined;
+        if (!tts) { done(null); return; }
+        const voice = tts['name'] as string;
+        const languages = (tts['languages'] as string[] | undefined) ?? [];
+        done({ voice, languages });
+      } catch {
+        logger.warn(`TTS discover: unexpected response from ${host}:${port} — ${line.slice(0, 120)}`);
+        done(null);
+      }
+    });
+
+    socket.on('error', (err) => {
+      logger.warn(`TTS discover connection error for ${host}:${port} — ${err.message}`);
+      done(null);
+    });
+
+    socket.on('end', () => done(null));
+  });
+}
+
 /**
  * Assembles a valid WAV file from raw PCM chunks and audio metadata.
  * Wyoming audio-chunk payloads are raw little-endian PCM — no WAV header.

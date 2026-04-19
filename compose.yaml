@@ -9,8 +9,8 @@ services:
       BASE_URL: ${BASE_URL:-http://localhost:3000}
       RSS_URL: ${RSS_URL:-}
       POLL_INTERVAL: ${POLL_INTERVAL:-}
-      PIPER_HOST: tts
-      PIPER_PORT: "10200"
+      PIPER_SERVICES: "tts-english:10200,tts-spanish:10200"
+      PIPER_VOICE: ${PIPER_VOICE:-en_US-lessac-medium}
       TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
       TTS_MAX_RETRIES: ${TTS_MAX_RETRIES:-3}
       RSS_FETCH_TIMEOUT: ${RSS_FETCH_TIMEOUT:-30000}

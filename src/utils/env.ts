@@ -14,11 +14,16 @@ function num(key: string, defaultValue: number): number {
   return n;
 }
 
+function requireStr(key: string): string {
+  const val = process.env[key];
+  if (!val) throw new Error(`Required env var ${key} is not set`);
+  return val;
+}
+
 export const env = {
   // Worker
   POLL_INTERVAL: () => str('POLL_INTERVAL'),
-  PIPER_HOST: () => str('PIPER_HOST', 'localhost'),
-  PIPER_PORT: () => num('PIPER_PORT', 10200),
+  PIPER_SERVICES: () => requireStr('PIPER_SERVICES'),
   TTS_TIMEOUT: () => num('TTS_TIMEOUT', 300) * 1000,
   TTS_MAX_RETRIES: () => num('TTS_MAX_RETRIES', 3),
   RSS_FETCH_TIMEOUT: () => num('RSS_FETCH_TIMEOUT', 30000),

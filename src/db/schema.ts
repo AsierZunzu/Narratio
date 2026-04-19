@@ -7,6 +7,8 @@ export const ttsServices = sqliteTable('tts_services', {
   name:       text('name').notNull(),
   host:       text('host').notNull(),
   port:       integer('port').notNull(),
+  voice:      text('voice'),
+  languages:  text('languages'),
   created_at: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
