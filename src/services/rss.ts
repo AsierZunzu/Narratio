@@ -1,6 +1,5 @@
 import Parser from 'rss-parser';
 import type { Db } from '../db/index.js';
-import path from 'path';
 import { extract } from '@extractus/article-extractor';
 import { htmlToText } from '../utils/html.js';
 import { logger } from '../utils/logger.js';
@@ -131,7 +130,7 @@ export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void
       clearTimeout(timer);
     }
   } catch (err) {
-    throw new Error(`Failed to fetch RSS feed: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`Failed to fetch RSS feed: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
 
   logger.info(`Feed fetched: ${feed.items.length} items found`);
@@ -182,6 +181,7 @@ const TTS_MAX_CHARS = 50_000;
  */
 function sanitiseText(raw: string): string {
   return raw
+    // eslint-disable-next-line no-control-regex -- intentionally matches control chars to strip them from TTS input
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD\uE000-\uF8FF]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

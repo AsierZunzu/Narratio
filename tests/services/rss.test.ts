@@ -1,14 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../src/db/schema.js';
 import { TEST_SCHEMA_SQL as SCHEMA_SQL } from '../helpers/schema.js';
-import net from 'net';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { processFeed } from '../../src/services/rss.js';
-import { getArticleByGuid, getPublishedArticles } from '../../src/db/articles.js';
+import { getArticleByGuid } from '../../src/db/articles.js';
 import type { Db } from '../../src/db/index.js';
 
 function makeDb(): Db {
@@ -19,23 +18,6 @@ function makeDb(): Db {
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-rss-'));
-}
-
-const FAKE_WAV = Buffer.alloc(44, 0); // minimal non-empty buffer
-
-function buildFeedXml(items: Array<{ title: string; guid: string; content?: string; link?: string }>) {
-  const itemsXml = items
-    .map(
-      (i) => `
-    <item>
-      <title>${i.title}</title>
-      <guid>${i.guid}</guid>
-      ${i.link ? `<link>${i.link}</link>` : ''}
-      ${i.content ? `<description>${i.content}</description>` : ''}
-    </item>`,
-    )
-    .join('');
-  return `<?xml version="1.0"?><rss version="2.0"><channel><title>Test</title>${itemsXml}</channel></rss>`;
 }
 
 // We mock the rss-parser and synthesise at module level
