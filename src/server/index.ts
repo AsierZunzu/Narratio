@@ -2,6 +2,7 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import net from 'net';
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
@@ -271,6 +272,42 @@ export function createApp(dbPath = DB_PATH): express.Application {
   });
 
   // ── TTS Services API ─────────────────────────────────────────────────────────
+
+  app.post('/api/tts-services/test-connection', (req, res) => {
+    const { host, port } = req.body ?? {};
+    if (!host || port == null) {
+      res.status(400).json({ ok: false, message: 'Missing required fields: host, port' });
+      return;
+    }
+    const portNum = Number(port);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+      res.status(400).json({ ok: false, message: 'port must be an integer between 1 and 65535' });
+      return;
+    }
+    const CONNECT_TIMEOUT_MS = 5000;
+    const socket = new net.Socket();
+    let settled = false;
+
+    const done = (ok: boolean, message: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      res.json({ ok, message });
+    };
+
+    const timer = setTimeout(() => {
+      done(false, `Connection timed out after ${CONNECT_TIMEOUT_MS / 1000}s — host unreachable or port not open`);
+    }, CONNECT_TIMEOUT_MS);
+
+    socket.connect(portNum, String(host), () => {
+      done(true, `Connected to ${String(host)}:${portNum} successfully`);
+    });
+
+    socket.on('error', (err) => {
+      done(false, `Connection failed: ${err.message}`);
+    });
+  });
 
   app.get('/api/tts-services', (_req, res) => {
     res.json(getTtsServices(db));

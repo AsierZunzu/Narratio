@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import net from 'net';
 import * as schema from '../../src/db/schema.js';
 import { TEST_SCHEMA_SQL as SCHEMA_SQL } from '../helpers/schema.js';
 import os from 'os';
@@ -119,5 +120,70 @@ describe('DELETE /api/tts-services/:id', () => {
     const app = createApp(dbPath);
     const res = await request(app).delete(`/api/tts-services/${svc.id}`);
     expect(res.status).toBe(409);
+  });
+});
+
+describe('POST /api/tts-services/test-connection', () => {
+  it('returns 400 for missing host', async () => {
+    resetDb();
+    const { dbPath } = makeTempDb();
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/tts-services/test-connection').send({ port: 10200 });
+    expect(res.status).toBe(400);
+    expect(res.body.ok).toBe(false);
+  });
+
+  it('returns 400 for missing port', async () => {
+    resetDb();
+    const { dbPath } = makeTempDb();
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/tts-services/test-connection').send({ host: 'localhost' });
+    expect(res.status).toBe(400);
+    expect(res.body.ok).toBe(false);
+  });
+
+  it('returns 400 for invalid port', async () => {
+    resetDb();
+    const { dbPath } = makeTempDb();
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/tts-services/test-connection').send({ host: 'localhost', port: 99999 });
+    expect(res.status).toBe(400);
+    expect(res.body.ok).toBe(false);
+  });
+
+  it('returns ok:false when connection is refused', async () => {
+    resetDb();
+    const { dbPath } = makeTempDb();
+    const app = createApp(dbPath);
+    // Port 1 is almost never open and connection-refused arrives quickly
+    const res = await request(app)
+      .post('/api/tts-services/test-connection')
+      .send({ host: '127.0.0.1', port: 1 })
+      .timeout(10000);
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(false);
+    expect(typeof res.body.message).toBe('string');
+  });
+
+  it('returns ok:true when connection succeeds', async () => {
+    resetDb();
+    const { dbPath } = makeTempDb();
+    const app = createApp(dbPath);
+
+    // Spin up a minimal TCP server on a random port
+    const server = net.createServer();
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as net.AddressInfo).port;
+
+    try {
+      const res = await request(app)
+        .post('/api/tts-services/test-connection')
+        .send({ host: '127.0.0.1', port });
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(typeof res.body.message).toBe('string');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

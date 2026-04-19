@@ -321,9 +321,15 @@
               <input id="t-port" name="port" type="number" required min="1" max="65535" placeholder="10200">
             </div>
           </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-link" id="tts-form-cancel">Cancel</button>
-            <button type="submit" class="btn btn-primary" id="tts-form-submit">Save</button>
+          <div class="form-actions" style="justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button type="button" class="btn btn-link" id="tts-test-btn">Test Connection</button>
+              <span id="tts-test-result" style="font-size:12px"></span>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button type="button" class="btn btn-link" id="tts-form-cancel">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="tts-form-submit">Save</button>
+            </div>
           </div>
         </form>
       </div>
@@ -557,6 +563,8 @@
 
     function openTtsModal(svc) {
       ttsForm.reset();
+      const testResultEl = document.getElementById('tts-test-result');
+      if (testResultEl) testResultEl.textContent = '';
       if (svc) {
         document.getElementById('tts-modal-title').textContent = 'Edit TTS Service';
         ttsIdInput.value = svc.id;
@@ -576,6 +584,45 @@
     document.getElementById('tts-form-cancel').addEventListener('click', closeTtsModal);
     document.getElementById('tts-modal-backdrop').addEventListener('click', closeTtsModal);
     document.getElementById('add-tts-btn').addEventListener('click', () => openTtsModal(null));
+
+    // ── TTS connection test ────────────────────────────────────────────────────
+    document.getElementById('tts-test-btn').addEventListener('click', async () => {
+      const host = ttsForm.elements['host'].value.trim();
+      const port = ttsForm.elements['port'].value.trim();
+      const resultEl = document.getElementById('tts-test-result');
+      const testBtn = document.getElementById('tts-test-btn');
+
+      if (!host || !port) {
+        resultEl.style.color = '#f87171';
+        resultEl.textContent = 'Enter host and port first';
+        return;
+      }
+
+      testBtn.disabled = true;
+      resultEl.style.color = '#94a3b8';
+      resultEl.textContent = 'Testing…';
+
+      try {
+        const res = await fetch('/api/tts-services/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ host, port: Number(port) }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          resultEl.style.color = '#86efac';
+          resultEl.textContent = '✓ ' + data.message;
+        } else {
+          resultEl.style.color = '#f87171';
+          resultEl.textContent = '✗ ' + data.message;
+        }
+      } catch {
+        resultEl.style.color = '#f87171';
+        resultEl.textContent = '✗ Network error';
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
 
     ttsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
