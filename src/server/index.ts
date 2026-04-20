@@ -378,6 +378,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
   return app;
 }
 
+/* c8 ignore start */
 async function main(): Promise<void> {
   const app = createApp();
   const db = getDb(DB_PATH);
@@ -420,3 +421,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(1);
   });
 }
+/* c8 ignore end */

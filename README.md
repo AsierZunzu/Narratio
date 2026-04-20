@@ -199,6 +199,19 @@ npm run lint       # Type-check without emitting
 
 Tests use in-memory SQLite and mock TCP servers — no Piper instance needed.
 
+**Coverage:**
+
+```bash
+npx vitest run --coverage
+```
+
+Opens an HTML report at `coverage/index.html`. Install the provider on first run if prompted:
+
+```bash
+npm install --save-dev @vitest/coverage-v8
+npx vitest run --coverage
+```
+
 ---
 
 ## Docker Compose services

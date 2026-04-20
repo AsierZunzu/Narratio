@@ -5,5 +5,8 @@
 dist/
 data/
 
+#Tests
+/coverage*
+
 # Docker
 /compose.override.yaml
