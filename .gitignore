@@ -1,12 +1,12 @@
 # Node
 /node_modules
 
-# Testing
-/coverage/
-
 #App
 dist/
 data/
+
+#Tests
+/coverage*
 
 # Docker
 /compose.override.yaml

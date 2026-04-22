@@ -1,143 +1,226 @@
 # Narratio
 
-> **Personal project** — built for self-use and as a testbed for exploring different AI-assisted programming techniques and tools. Shared as-is with no guarantees of stability, support, or general-purpose usability.
+Self-hosted RSS-to-podcast. Fetches articles from any RSS feed, synthesises them into audio via [Piper TTS](https://github.com/rhasspy/piper), and serves a standards-compliant Podcast RSS feed that any podcast client (Pinepods, Pocket Casts, Overcast, etc.) can subscribe to.
 
-Narratio is a TypeScript-based application that periodically fetches articles from RSS feeds, converts them into natural-sounding audio files using the Piper TTS engine, and serves them as a valid Podcast RSS feed compatible with services like Pinepods.
+---
 
-## Prerequisites
+## How it works
 
-- **Node.js**: version 24 or higher
-- **Docker & Docker Compose** (for easy deployment)
+```
+RSS Feed  ──►  Worker  ──►  Piper TTS  ──►  WAV files
+                  │                              │
+                SQLite  ◄─────────────────────────┘
+                  │
+              Server  ──►  GET /rss   (podcast feed)
+                       ──►  GET /      (dashboard)
+                       ──►  GET /audio/:file
+```
 
-## Installation & Build
+A single `narratio` container runs both processes, sharing a SQLite database and audio volume with each other:
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd rss-to-podcast
-   ```
+- **Worker** — polls the RSS feed on a cron schedule, converts each new article to audio via Piper TTS over TCP, and runs cleanup to enforce disk quotas.
+- **Server** — serves the podcast RSS feed, static audio files, and a web dashboard.
+- **TTS** (`wyoming-piper`) — local text-to-speech engine; no API keys, no cloud, no per-character cost.
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+---
 
-3. Build the project:
-   ```bash
-   npm run build
-   ```
+## Quick start
+
+**1. Copy and edit the config:**
+
+```bash
+cp .env.example .env
+```
+
+Set at minimum:
+
+```env
+RSS_URL=https://example.com/feed.xml
+BASE_URL=http://your-server:3000   # must be reachable by your podcast client
+PIPER_VOICE=en_US-lessac-medium    # see Voice models below
+```
+
+**2. Start:**
+
+```bash
+docker compose up --build
+```
+
+Piper downloads the selected voice model on first run (~30–150 MB depending on quality). Once the `tts` health check passes, the worker begins ingesting articles.
+
+**3. Subscribe:**
+
+Point your podcast client at:
+
+```
+http://your-server:3000/rss
+```
+
+Open the dashboard at `http://your-server:3000`.
+
+---
 
 ## Configuration
 
-The application can be configured using environment variables. Default values are provided in `compose.yaml`.
+All configuration is via environment variables. Copy `.env.example` to `.env` and adjust.
 
-### Changing the RSS Feed URL
+### Worker
 
-Once the application is started with an `RSS_URL`, it stores this URL in its database to maintain consistency. If you need to change the RSS feed URL later, you must reinitialize the database, which will also delete all previously fetched articles and generated audio files.
+| Variable | Default | Description |
+|---|---|---|
+| `RSS_URL` | *(required)* | RSS feed URL to poll |
+| `POLL_INTERVAL` | *(unset)* | Cron expression. If unset, runs once and exits |
+| `FORCE_RESET` | *(unset)* | Set to `true` to wipe DB + audio on container startup |
+| `TTS_TIMEOUT` | `300` | TTS timeout in seconds |
+| `TTS_MAX_RETRIES` | `3` | Max retry attempts per article. `0` = no retries |
+| `RSS_FETCH_TIMEOUT` | `30000` | RSS fetch timeout in milliseconds |
+| `MAX_AUDIO_FILES` | *(unlimited)* | Max WAV files to retain |
+| `MAX_AUDIO_SIZE_MB` | *(unlimited)* | Max total audio storage in MB |
 
-**Manual Reinitialization:**
-If you are running the worker manually, use the `--force-reset` flag:
+### TTS / Piper
+
+| Variable | Default | Description |
+|---|---|---|
+| `PIPER_VOICE` | `en_US-lessac-medium` | Voice model (see below) |
+| `PIPER_HOST` | `tts` | Piper TCP host (set automatically in Compose) |
+| `PIPER_PORT` | `10200` | Piper TCP port |
+
+### Server
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP port |
+| `BASE_URL` | `http://localhost:3000` | Public URL used in audio enclosure links |
+| `PODCAST_TITLE` | `Narratio` | Feed title |
+| `PODCAST_DESCRIPTION` | *(empty)* | Feed description |
+| `PODCAST_AUTHOR` | `Narratio Worker` | Feed author |
+| `PODCAST_LANGUAGE` | `en` | Feed language (ISO 639-1) |
+| `PODCAST_ITUNES_CATEGORY` | `Technology` | iTunes category |
+| `PODCAST_ITUNES_OWNER_EMAIL` | `worker@example.com` | iTunes owner email |
+| `UNAVAILABLE_MESSAGE` | *"This content is no longer available…"* | Spoken when a purged article is played |
+| `TTS_FAILED_MESSAGE` | *"This podcast episode could not be generated…"* | Spoken when TTS failed |
+
+---
+
+## Voice models
+
+Piper supports many languages and voices. Browse the full list at [github.com/rhasspy/piper/blob/master/VOICES.md](https://github.com/rhasspy/piper/blob/master/VOICES.md).
+
+Voice name format: `{language}_{region}-{name}-{quality}`
+
+Quality tiers: `x_low` → `low` → `medium` → `high` (higher = better audio, slower synthesis, larger model file).
+
+**Examples:**
+
+| Language | Voice | Notes |
+|---|---|---|
+| English (US) | `en_US-lessac-medium` | Default |
+| English (GB) | `en_GB-alan-medium` | British accent |
+| Spanish (Spain) | `es_ES-sharvard-medium` | |
+| Spanish (Mexico) | `es_MX-claude-high` | Highest quality |
+| German | `de_DE-thorsten-medium` | |
+| French | `fr_FR-upmc-medium` | |
+
+Set `PIPER_VOICE` in your `.env` and restart. The model is downloaded automatically on first start and cached in `./data/piper`.
+
+---
+
+## Dashboard
+
+The web dashboard at `http://your-server:3000` shows all articles and their processing status.
+
+**Status badges:**
+
+| Badge | Meaning |
+|---|---|
+| **Pending** | Waiting for TTS synthesis |
+| **Converting** | TTS synthesis in progress |
+| **Done** | Audio generated, visible in podcast feed |
+| **Failed** | TTS failed (see retry count and error) |
+| **Purged** | Audio deleted by cleanup quota; article still in feed with fallback audio |
+
+**Actions:**
+
+| Button | Available on | Effect |
+|---|---|---|
+| ↗ Article | Articles with a source link | Opens original article in a new tab |
+| Retry | Failed articles | Resets retry counter → pending; worker will re-attempt on next poll |
+| Purge | Done articles | Deletes audio file immediately, frees disk space |
+| Delete | Any article | Removes article from DB entirely (will be re-ingested on next poll) |
+
+Click an article title to preview the plain-text content that was sent to TTS.
+
+---
+
+## Worker CLI flags
+
+Run these by overriding the container command:
+
 ```bash
-npm run start:worker -- <NEW_RSS_URL> --force-reset
+docker compose run --rm narratio node dist/worker/index.js --force-reset
+docker compose run --rm narratio node dist/worker/index.js --retry-failed
 ```
 
-**Docker Reinitialization:**
-If you are using Docker Compose, you can update the `RSS_URL` in your `compose.yaml` (or environment) and then run the following command to reinitialize:
-```bash
-docker compose run --rm worker npm run start:worker -- <NEW_RSS_URL> --force-reset
+| Flag | Effect |
+|---|---|
+| `--force-reset` | Deletes all audio files and reinitialises the database. **Required when changing `RSS_URL`.** |
+| `--retry-failed` | Resets retry counters for all failed articles, then runs immediately |
+| `--regen-audio` | Deletes all `.wav` files from `data/audio/` and resets every article (any status) to `pending` with zero retries, then exits. Useful when you want to regenerate audio with a different TTS model/voice without losing article history. |
+
+---
+
+## Storage layout
+
 ```
-Alternatively, you can manually delete the contents of the `data/` directory and restart the stack.
-
-### Retrying Failed TTS Generation
-
-If articles have exhausted their TTS retry limit (see `TTS_MAX_RETRIES`), you can reset all retry counters and trigger a new attempt with `--retry-failed`:
-
-```bash
-npm run start:worker -- <RSS_URL> --retry-failed
-```
-
-This resets the retry count and failure state for every article and then immediately runs the worker, so all articles without audio will be reattempted. In Docker:
-
-```bash
-docker compose run --rm worker npm run start:worker -- --retry-failed
-```
-
-### Worker Configuration
-- `RSS_URL`: The RSS feed URL to parse (required).
-- `POLL_INTERVAL`: Cron expression for periodic polling (e.g., `0 * * * *` for hourly). If not set, the worker runs once and exits.
-- `PIPER_HOST`: Host of the Piper TTS engine Wyoming API (default: `localhost`).
-- `PIPER_PORT`: Port of the Piper TTS engine Wyoming API (default: `10200`).
-- `MAX_AUDIO_FILES`: Maximum number of audio files to keep (default: `Infinity`).
-- `MAX_AUDIO_SIZE_MB`: Maximum total size of audio files in MB (default: `Infinity`).
-- `NODE_ENV`: Set to `production` for optimized execution.
-- `TTS_TIMEOUT`: Timeout for the TTS engine in seconds (default: `300`).
-- `TTS_MAX_RETRIES`: Maximum number of times to retry TTS generation for a failed article on subsequent polls (default: `3`). Set to `0` to disable retries.
-- `RSS_FETCH_TIMEOUT`: Timeout for fetching the RSS feed in milliseconds (default: `30000`).
-
-### Server Configuration
-- `PORT`: The port the web server will listen on (default: `3000`).
-- `PODCAST_TITLE`: Title of your generated podcast (default: `Narratio`).
-- `PODCAST_DESCRIPTION`: Description of your podcast (default: dynamic based on feed URL).
-- `PODCAST_AUTHOR`: Author name for the podcast (default: `Narratio Worker`).
-- `PODCAST_LANGUAGE`: Language code (default: `en`).
-- `PODCAST_ITUNES_AUTHOR`: iTunes-specific author name (defaults to `PODCAST_AUTHOR`).
-- `PODCAST_ITUNES_SUMMARY`: iTunes-specific summary (defaults to `PODCAST_DESCRIPTION`).
-- `PODCAST_ITUNES_OWNER_NAME`: iTunes-specific owner name (defaults to `PODCAST_AUTHOR`).
-- `PODCAST_ITUNES_OWNER_EMAIL`: iTunes-specific owner email (default: `worker@example.com`).
-- `PODCAST_ITUNES_CATEGORY`: iTunes-specific category (default: `Technology`).
-- `UNAVAILABLE_MESSAGE`: Message to be used for purged articles (default: `This content is no longer available on the server.`).
-
-## Usage
-
-### Using Docker (Recommended)
-
-The easiest way to run the full stack (Worker, Server, and TTS engine) is using Docker Compose:
-
-```bash
-docker compose up -d
+data/
+  app/
+    narratio.db       # SQLite database
+    audio/
+      <guid>.wav      # Generated audio files
+      unavailable.wav # Fallback for purged articles
+      tts-failed.wav  # Fallback for failed articles
+  piper/              # Piper voice model cache
 ```
 
-This will:
-- Start the **TTS engine** using the Piper image.
-- Start the **Worker** to fetch RSS feeds and generate audio.
-- Start the **Server** to provide the podcast feed at `http://localhost:3000/rss`.
+Both volumes are mounted from `./data` on the host.
 
-### Running Manually
-
-If you prefer to run components manually:
-
-1. **Start the Worker** to ingest feeds:
-   ```bash
-   npm run start:worker -- <RSS_URL1> <RSS_URL2>
-   ```
-
-2. **Start the Server** to serve the podcast:
-   ```bash
-   npm run start:server
-   ```
+---
 
 ## Development
 
-### Running Tests
-We use Jest for testing. To run the full test suite:
+**Requirements:** Node.js 22+, npm
+
 ```bash
-npm test
+npm install
+npm run build      # TypeScript → dist/
+npm test           # Vitest unit tests
+npm run lint       # Type-check without emitting
 ```
 
-### Linting
-To check for code style issues:
+Tests use in-memory SQLite and mock TCP servers — no Piper instance needed.
+
+**Coverage:**
+
 ```bash
-npm run lint
+npx vitest run --coverage
 ```
 
-To automatically fix linting issues:
+Opens an HTML report at `coverage/index.html`. Install the provider on first run if prompted:
+
 ```bash
-npm run lint:fix
+npm install --save-dev @vitest/coverage-v8
+npx vitest run --coverage
 ```
 
-## Architecture
+---
 
-- **Worker**: Periodically polls RSS feeds, extracts content and images (feed image, iTunes/media/HTML), and calls the TTS engine via Wyoming protocol (TCP).
-- **TTS Engine**: Converts text to WAV using [Piper](https://github.com/rhasspy/piper).
-- **SQLite**: Stores article metadata, processing status, and image URLs (both feed-level and per-article).
-- **Server**: Express-based web server that serves the generated MP3 files and the Podcast XML.
+## Docker Compose services
+
+| Service | Role |
+|---|---|
+| `tts` | Piper TTS engine (Wyoming TCP protocol, port 10200) |
+| `narratio` | RSS worker + web server (both run inside one container via `docker-entrypoint.sh`) |
+
+`narratio` depends on `tts` with a TCP health check and mounts `./data/app` at `/app/data`.
+
+To trigger a one-off force-reset without overriding the command, set `FORCE_RESET=true` in your `.env` — the entrypoint will wipe the DB and audio before starting normally.

@@ -1,14 +1,17 @@
-export interface Logger {
-  log: (message: string, ...args: unknown[]) => void
-  warn: (message: string, ...args: unknown[]) => void
-  error: (message: string, ...args: unknown[]) => void
+type Level = 'info' | 'warn' | 'error' | 'debug';
+
+function format(level: Level, message: string): string {
+  return `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}`;
 }
 
-export function createLogger(tag: string): Logger {
-  const prefix = `[${tag}]`
-  return {
-    log:   (message, ...args) => console.log(`${prefix} ${message}`, ...args),
-    warn:  (message, ...args) => console.warn(`${prefix} ${message}`, ...args),
-    error: (message, ...args) => console.error(`${prefix} ${message}`, ...args),
-  }
-}
+export const logger = {
+  info: (msg: string) => console.log(format('info', msg)),
+  warn: (msg: string) => console.warn(format('warn', msg)),
+  error: (msg: string, err?: unknown) => {
+    const detail = err instanceof Error ? ` — ${err.message}` : err !== undefined ? ` — ${String(err)}` : '';
+    console.error(format('error', msg + detail));
+  },
+  debug: (msg: string) => {
+    if (process.env['DEBUG']) console.debug(format('debug', msg));
+  },
+};

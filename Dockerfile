@@ -1,34 +1,32 @@
-FROM node:24-slim AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY package*.json ./
+COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Copy the rest and build
-COPY . .
+COPY tsconfig.json ./
+COPY src/ ./src/
 RUN npm run build
 
-# Second stage: production
-FROM node:24-slim
+
+FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
-# Ensure non-root user and correct permissions for volume
-RUN mkdir -p /app/data && chown -R node:node /app/data
+RUN addgroup -S narratio && adduser -S narratio -G narratio
 
-# Only copy what's needed for production
-COPY --from=builder /app/package*.json ./
+COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+
+RUN mkdir -p /app/data/audio && chown -R narratio:narratio /app/data \
+    && chmod +x docker-entrypoint.sh
+
+USER narratio
 
 EXPOSE 3000
 
-USER node
-
-VOLUME ["/app/data"]
-
-# Set default command (can be overridden)
-CMD ["npm", "run", "start:server"]
+CMD ["./docker-entrypoint.sh"]

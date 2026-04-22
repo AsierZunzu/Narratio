@@ -1,69 +1,56 @@
 services:
-  narratio-server:
-    image: ghcr.io/asierzunzu/narratio:latest
-#    build: .
-    container_name: server
-    ports:
-      - "3000:3000"
+  tts:
+    image: rhasspy/wyoming-piper
+    restart: unless-stopped
+    command: --voice ${PIPER_VOICE:-en_US-lessac-medium}
     volumes:
-      - ./data/app:/app/data
-    environment:
-      - NODE_ENV=production
-      - PIPER_HOST=piper
-      - PIPER_PORT=10200
-      - PODCAST_TITLE=Narratio
-      - PODCAST_DESCRIPTION=Automatically generated podcast from RSS feeds
-      - PODCAST_AUTHOR=Narratio Worker
-      - PODCAST_LANGUAGE=en
-      - PODCAST_ITUNES_CATEGORY=Technology
-      - PODCAST_ITUNES_OWNER_EMAIL=worker@example.com
-      - UNAVAILABLE_MESSAGE=This content is no longer available on the server.
-    depends_on:
-      piper:
-        condition: service_healthy
-    command: ["npm", "run", "start:server"]
-
-  narratio-worker:
-    image: ghcr.io/asierzunzu/narratio:latest
-#    build: .
-    container_name: worker
-    volumes:
-      - ./data/app:/app/data
-    environment:
-      - NODE_ENV=production
-      - PIPER_HOST=piper
-      - PIPER_PORT=10200
-      - RSS_URL=http://feeds.bbci.co.uk/news/rss.xml
-      - POLL_INTERVAL=0 * * * *
-      - MAX_AUDIO_FILES=50
-      - MAX_AUDIO_SIZE_MB=500
-    depends_on:
-      piper:
-        condition: service_healthy
-    # Example usage (can still override via CLI):
-    command: ["npm", "run", "start:worker"]
-
-  piper:
-    image: lscr.io/linuxserver/piper:latest
-    container_name: piper
-    volumes:
-      - ./data/piper:/config
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - PIPER_VOICE=en_US-lessac-medium # For natural Spanish voices, use "es_ES-sharvard-medium"
-      - LOCAL_ONLY= #optional
-      - PIPER_LENGTH=1.0 #optional
-      - PIPER_NOISE=0.667 #optional
-      - PIPER_NOISEW=0.333 #optional
-      - PIPER_SPEAKER=0 #optional
-      - NO_STREAMING= #optional
+      - ./data/piper:/data
     healthcheck:
-      test: >
-        bash -c 'printf "{\"type\":\"describe\"}\n" | nc -q 1 localhost 10200 | grep -q "type.*info"'
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.connect((\"localhost\",10200)); s.close()'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  narratio:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      PORT: ${PORT:-3000}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      RSS_URL: ${RSS_URL}
+      POLL_INTERVAL: ${POLL_INTERVAL:-}
+      PIPER_HOST: tts
+      PIPER_PORT: "10200"
+      PIPER_VOICE: ${PIPER_VOICE:-en_US-lessac-medium}
+      TTS_TIMEOUT: ${TTS_TIMEOUT:-300}
+      TTS_MAX_RETRIES: ${TTS_MAX_RETRIES:-3}
+      RSS_FETCH_TIMEOUT: ${RSS_FETCH_TIMEOUT:-30000}
+      MAX_AUDIO_FILES: ${MAX_AUDIO_FILES:-}
+      MAX_AUDIO_SIZE_MB: ${MAX_AUDIO_SIZE_MB:-}
+      FORCE_RESET: ${FORCE_RESET:-}
+      PODCAST_TITLE: ${PODCAST_TITLE:-Narratio}
+      PODCAST_DESCRIPTION: ${PODCAST_DESCRIPTION:-}
+      PODCAST_AUTHOR: ${PODCAST_AUTHOR:-Narratio Worker}
+      PODCAST_LANGUAGE: ${PODCAST_LANGUAGE:-en}
+      PODCAST_ITUNES_AUTHOR: ${PODCAST_ITUNES_AUTHOR:-}
+      PODCAST_ITUNES_SUMMARY: ${PODCAST_ITUNES_SUMMARY:-}
+      PODCAST_ITUNES_OWNER_NAME: ${PODCAST_ITUNES_OWNER_NAME:-}
+      PODCAST_ITUNES_OWNER_EMAIL: ${PODCAST_ITUNES_OWNER_EMAIL:-worker@example.com}
+      PODCAST_ITUNES_CATEGORY: ${PODCAST_ITUNES_CATEGORY:-Technology}
+      UNAVAILABLE_MESSAGE: ${UNAVAILABLE_MESSAGE:-This content is no longer available on the server.}
+      TTS_FAILED_MESSAGE: ${TTS_FAILED_MESSAGE:-This podcast episode could not be generated due to a text-to-speech error.}
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./data/app:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null"]
+      interval: 15s
+      timeout: 5s
       retries: 3
-      start_period: 60s
-      start_interval: 5s
+      start_period: 10s
+    depends_on:
+      tts:
+        condition: service_healthy
