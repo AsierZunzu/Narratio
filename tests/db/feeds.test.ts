@@ -10,7 +10,9 @@ import {
   insertFeed,
   updateFeed,
   deleteFeed,
+  deleteFeedWithArticles,
 } from '../../src/db/feeds.js';
+import { insertArticle, markArticleDone, markArticlePurged, countArticlesByFeed } from '../../src/db/articles.js';
 import { insertTtsService } from '../../src/db/tts-services.js';
 import type { Db } from '../../src/db/index.js';
 
@@ -155,5 +157,48 @@ describe('deleteFeed', () => {
   it('returns false for unknown id', () => {
     const db = makeDb();
     expect(deleteFeed(db, 999)).toBe(false);
+  });
+});
+
+describe('deleteFeedWithArticles', () => {
+  it('cascades articles for target feed only and returns audio filenames', () => {
+    const db = makeDb();
+    const tts = seedTtsService(db);
+    const feedA = insertFeed(db, { ...baseFeed(tts.id), slug: 'feed-a', rss_url: 'https://a.com/f' });
+    const feedB = insertFeed(db, { ...baseFeed(tts.id), slug: 'feed-b', rss_url: 'https://b.com/f' });
+
+    // Feed A: 3 articles with varied statuses
+    insertArticle(db, { guid: 'a1', feed_url: feedA.rss_url, feed_id: feedA.id, title: 'A1', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'a1', 'a1.wav', 100);
+    insertArticle(db, { guid: 'a2', feed_url: feedA.rss_url, feed_id: feedA.id, title: 'A2', link: null, pub_date: null, content: null, image_url: null });
+    // a2 stays pending — audio_file remains null
+    insertArticle(db, { guid: 'a3', feed_url: feedA.rss_url, feed_id: feedA.id, title: 'A3', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'a3', 'a3.wav', 200);
+    markArticlePurged(db, 'a3'); // clears audio_file
+
+    // Feed B: one article we must keep
+    insertArticle(db, { guid: 'b1', feed_url: feedB.rss_url, feed_id: feedB.id, title: 'B1', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'b1', 'b1.wav', 50);
+
+    const result = deleteFeedWithArticles(db, feedA.id);
+
+    expect(result.articleCount).toBe(3);
+    expect(result.audioFiles.sort()).toEqual(['a1.wav']);
+
+    expect(getFeedById(db, feedA.id)).toBeUndefined();
+    expect(countArticlesByFeed(db, feedA.id)).toBe(0);
+
+    expect(getFeedById(db, feedB.id)).toBeDefined();
+    expect(countArticlesByFeed(db, feedB.id)).toBe(1);
+  });
+
+  it('deletes feed with no articles and returns empty filenames', () => {
+    const db = makeDb();
+    const tts = seedTtsService(db);
+    const feed = insertFeed(db, baseFeed(tts.id));
+    const result = deleteFeedWithArticles(db, feed.id);
+    expect(result.articleCount).toBe(0);
+    expect(result.audioFiles).toEqual([]);
+    expect(getFeedById(db, feed.id)).toBeUndefined();
   });
 });

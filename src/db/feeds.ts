@@ -1,6 +1,7 @@
 import { eq, count } from 'drizzle-orm';
 import type { Db } from './index.js';
 import { feeds } from './schema.js';
+import { getAudioFilesByFeed, deleteArticlesByFeed } from './articles.js';
 
 export type { Feed } from './schema.js';
 
@@ -56,4 +57,13 @@ export function deleteFeed(db: Db, id: number): boolean {
 export function countFeedsByTtsService(db: Db, ttsServiceId: number): number {
   const result = db.select({ count: count() }).from(feeds).where(eq(feeds.tts_service_id, ttsServiceId)).get();
   return result?.count ?? 0;
+}
+
+export function deleteFeedWithArticles(db: Db, feedId: number): { audioFiles: string[]; articleCount: number } {
+  return db.transaction((tx) => {
+    const audioFiles = getAudioFilesByFeed(tx, feedId);
+    const articleCount = deleteArticlesByFeed(tx, feedId);
+    tx.delete(feeds).where(eq(feeds.id, feedId)).run();
+    return { audioFiles, articleCount };
+  });
 }

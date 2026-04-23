@@ -188,18 +188,63 @@ describe('DELETE /api/feeds/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 409 when feed has articles', async () => {
+  it('cascades articles and audio files, returns 204', async () => {
     resetDb();
     const { db, dbPath } = makeTempDb();
+    const audioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-audio-'));
     const ttsId = seedTts(db);
-    const feed = insertFeed(db, feedPayload(ttsId));
-    insertArticle(db, { guid: 'a1', feed_url: feed.rss_url, feed_id: feed.id, title: 'Art', link: null, pub_date: null, content: null, image_url: null });
+    const feedA = insertFeed(db, feedPayload(ttsId, 'feed-a'));
+    const feedB = insertFeed(db, feedPayload(ttsId, 'feed-b'));
+
+    insertArticle(db, { guid: 'a1', feed_url: feedA.rss_url, feed_id: feedA.id, title: 'A1', link: null, pub_date: null, content: null, image_url: null });
     markArticleDone(db, 'a1', 'a1.wav', 0);
+    insertArticle(db, { guid: 'a2', feed_url: feedA.rss_url, feed_id: feedA.id, title: 'A2', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'a2', 'a2.wav', 0);
+    insertArticle(db, { guid: 'b1', feed_url: feedB.rss_url, feed_id: feedB.id, title: 'B1', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'b1', 'b1.wav', 0);
     db.$client.close();
 
-    const app = createApp(dbPath);
+    // Write real WAV files
+    const wavA1 = path.join(audioDir, 'a1.wav');
+    const wavA2 = path.join(audioDir, 'a2.wav');
+    const wavB1 = path.join(audioDir, 'b1.wav');
+    fs.writeFileSync(wavA1, Buffer.from('RIFFxxxxWAVE'));
+    fs.writeFileSync(wavA2, Buffer.from('RIFFxxxxWAVE'));
+    fs.writeFileSync(wavB1, Buffer.from('RIFFxxxxWAVE'));
+
+    const app = createApp(dbPath, audioDir);
+    const res = await request(app).delete(`/api/feeds/${feedA.id}`);
+    expect(res.status).toBe(204);
+
+    // Feed A rows gone, feed B intact
+    const list = await request(app).get('/api/feeds');
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].slug).toBe('feed-b');
+
+    // Feed A WAVs gone; feed B WAV intact
+    expect(fs.existsSync(wavA1)).toBe(false);
+    expect(fs.existsSync(wavA2)).toBe(false);
+    expect(fs.existsSync(wavB1)).toBe(true);
+  });
+
+  it('returns 204 even when audio files are already missing (ENOENT)', async () => {
+    resetDb();
+    const { db, dbPath } = makeTempDb();
+    const audioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-audio-'));
+    const ttsId = seedTts(db);
+    const feed = insertFeed(db, feedPayload(ttsId));
+    insertArticle(db, { guid: 'a1', feed_url: feed.rss_url, feed_id: feed.id, title: 'A1', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'a1', 'ghost.wav', 0);
+    db.$client.close();
+
+    // Do NOT create ghost.wav
+
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).delete(`/api/feeds/${feed.id}`);
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(204);
+
+    const list = await request(app).get('/api/feeds');
+    expect(list.body).toHaveLength(0);
   });
 });
 

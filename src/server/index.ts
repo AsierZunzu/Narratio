@@ -6,8 +6,8 @@ import net from 'net';
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
-import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, countArticlesByFeed } from '../db/articles.js';
-import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeed, countFeedsByTtsService } from '../db/feeds.js';
+import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid } from '../db/articles.js';
+import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeedWithArticles, countFeedsByTtsService } from '../db/feeds.js';
 import { getTtsServices, getTtsServiceById, insertTtsService, updateTtsService, deleteTtsService } from '../db/tts-services.js';
 import { synthesise } from '../services/tts.js';
 import { env } from '../utils/env.js';
@@ -61,7 +61,7 @@ async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> 
   }
 }
 
-export function createApp(dbPath = DB_PATH): express.Application {
+export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Application {
   const app = express();
   const db = getDb(dbPath);
 
@@ -73,7 +73,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
       res.status(400).send('Bad request');
       return;
     }
-    const filePath = path.join(AUDIO_DIR, filename);
+    const filePath = path.join(audioDir, filename);
     if (!fs.existsSync(filePath)) {
       res.status(404).send('Not found');
       return;
@@ -142,7 +142,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
     }
 
     if (article.audio_file) {
-      const filePath = path.join(AUDIO_DIR, article.audio_file);
+      const filePath = path.join(audioDir, article.audio_file);
       try { fs.unlinkSync(filePath); } catch { /* already gone */ }
     }
 
@@ -170,7 +170,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
     }
 
     if (article.audio_file) {
-      const filePath = path.join(AUDIO_DIR, article.audio_file);
+      const filePath = path.join(audioDir, article.audio_file);
       try { fs.unlinkSync(filePath); } catch { /* already gone */ }
     }
 
@@ -261,13 +261,23 @@ export function createApp(dbPath = DB_PATH): express.Application {
       return;
     }
 
-    const articleCount = countArticlesByFeed(db, id);
-    if (articleCount > 0) {
-      res.status(409).send(`Cannot delete: feed has ${articleCount} article(s). Delete articles first.`);
-      return;
+    const { audioFiles, articleCount } = deleteFeedWithArticles(db, id);
+
+    for (const filename of audioFiles) {
+      const filePath = path.join(audioDir, filename);
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code;
+        if (code === 'ENOENT') {
+          logger.debug(`Audio file already gone: ${filename}`);
+        } else {
+          logger.warn(`Failed to unlink audio file ${filename}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
 
-    deleteFeed(db, id);
+    logger.info(`Deleted feed ${id} with ${articleCount} article(s) and ${audioFiles.length} audio file(s)`);
     res.status(204).end();
   });
 
