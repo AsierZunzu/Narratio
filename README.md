@@ -90,7 +90,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
-| `BASE_URL` | `http://localhost:3000` | Public URL used in audio enclosure links |
+| `BASE_URL` | *(derived from request)* | Public URL for audio/feed links. Optional — when unset, derived from the request's `Host` header and `X-Forwarded-Proto` (reverse-proxy friendly). Set explicitly if the external URL differs from what Node sees |
 | `PODCAST_TITLE` | `Narratio` | Feed title |
 | `PODCAST_DESCRIPTION` | *(empty)* | Feed description |
 | `PODCAST_AUTHOR` | `Narratio Worker` | Feed author |

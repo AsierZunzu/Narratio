@@ -61,10 +61,15 @@ async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> 
   }
 }
 
+function getBaseUrl(req: express.Request): string {
+  return env.BASE_URL() ?? `${req.protocol}://${req.get('host')}`;
+}
+
 export function createApp(dbPath = DB_PATH): express.Application {
   const app = express();
   const db = getDb(dbPath);
 
+  app.set('trust proxy', true);
   app.use(express.json());
 
   app.get('/audio/:file', (req, res) => {
@@ -83,7 +88,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
   });
 
   app.get('/rss/:slug', (req, res) => {
-    const baseUrl = process.env['BASE_URL'] ?? `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getBaseUrl(req);
     try {
       const feed = getFeedBySlug(db, req.params['slug']!);
       if (!feed) {
@@ -112,7 +117,7 @@ export function createApp(dbPath = DB_PATH): express.Application {
   // ── Dashboard UI ────────────────────────────────────────────────────────────
 
   app.get('/', (req, res) => {
-    const baseUrl = process.env['BASE_URL'] ?? `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getBaseUrl(req);
     try {
       const articles = getAllArticles(db);
       const feedsList = getFeeds(db);
@@ -384,7 +389,7 @@ async function main(): Promise<void> {
   const db = getDb(DB_PATH);
   const port = env.PORT();
 
-  const baseUrl = process.env['BASE_URL'] ?? `http://localhost:${port}`;
+  const baseUrl = env.BASE_URL() ?? `http://localhost:${port}`;
 
   const server = app.listen(port, () => {
     logger.info('Narratio server is ready');
