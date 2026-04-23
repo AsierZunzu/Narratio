@@ -1,4 +1,4 @@
-import { eq, lt, inArray, and, asc, desc, sql, count } from 'drizzle-orm';
+import { eq, lt, inArray, and, asc, desc, sql, count, isNotNull } from 'drizzle-orm';
 import type { Db, ArticleStatus } from './index.js';
 import { articles } from './schema.js';
 
@@ -125,6 +125,18 @@ export function getDoneArticlesOrderedByDateByFeed(db: Db, feedId: number) {
 export function countArticlesByFeed(db: Db, feedId: number): number {
   const result = db.select({ count: count() }).from(articles).where(eq(articles.feed_id, feedId)).get();
   return result?.count ?? 0;
+}
+
+export function getAudioFilesByFeed(db: Db, feedId: number): string[] {
+  const rows = db.select({ audio_file: articles.audio_file }).from(articles)
+    .where(and(eq(articles.feed_id, feedId), isNotNull(articles.audio_file)))
+    .all();
+  return rows.map((r) => r.audio_file).filter((f): f is string => f !== null);
+}
+
+export function deleteArticlesByFeed(db: Db, feedId: number): number {
+  const result = db.delete(articles).where(eq(articles.feed_id, feedId)).run();
+  return result.changes;
 }
 
 export function updateArticleStatus(db: Db, guid: string, status: ArticleStatus): void {
