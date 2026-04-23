@@ -4,7 +4,7 @@ import { env } from '../../src/utils/env.ts';
 const KEYS = [
   'RSS_URL', 'POLL_INTERVAL', 'PIPER_HOST', 'PIPER_PORT', 'TTS_TIMEOUT',
   'TTS_MAX_RETRIES', 'RSS_FETCH_TIMEOUT', 'MAX_AUDIO_FILES', 'MAX_AUDIO_SIZE_MB',
-  'PORT', 'PODCAST_TITLE', 'PODCAST_DESCRIPTION', 'PODCAST_AUTHOR',
+  'PORT', 'BASE_URL', 'PODCAST_TITLE', 'PODCAST_DESCRIPTION', 'PODCAST_AUTHOR',
   'PODCAST_LANGUAGE', 'PODCAST_ITUNES_AUTHOR', 'PODCAST_ITUNES_SUMMARY',
   'PODCAST_ITUNES_OWNER_NAME', 'PODCAST_ITUNES_OWNER_EMAIL',
   'PODCAST_ITUNES_CATEGORY', 'UNAVAILABLE_MESSAGE', 'TTS_FAILED_MESSAGE',
@@ -143,6 +143,40 @@ describe('env', () => {
   it('PORT returns numeric value when set', () => {
     process.env.PORT = '8080';
     expect(env.PORT()).toBe(8080);
+  });
+
+  it('BASE_URL returns undefined when unset', () => {
+    expect(env.BASE_URL()).toBeUndefined();
+  });
+
+  it('BASE_URL returns undefined when empty string', () => {
+    process.env.BASE_URL = '';
+    expect(env.BASE_URL()).toBeUndefined();
+  });
+
+  it('BASE_URL returns value when set', () => {
+    process.env.BASE_URL = 'https://podcast.example.com';
+    expect(env.BASE_URL()).toBe('https://podcast.example.com');
+  });
+
+  it('BASE_URL strips a single trailing slash', () => {
+    process.env.BASE_URL = 'https://podcast.example.com/';
+    expect(env.BASE_URL()).toBe('https://podcast.example.com');
+  });
+
+  it('BASE_URL strips multiple trailing slashes', () => {
+    process.env.BASE_URL = 'https://podcast.example.com///';
+    expect(env.BASE_URL()).toBe('https://podcast.example.com');
+  });
+
+  it('BASE_URL preserves path but strips trailing slash', () => {
+    process.env.BASE_URL = 'https://example.com/narratio/';
+    expect(env.BASE_URL()).toBe('https://example.com/narratio');
+  });
+
+  it('BASE_URL throws on malformed URL', () => {
+    process.env.BASE_URL = 'not a url';
+    expect(() => env.BASE_URL()).toThrow('BASE_URL must be a valid URL');
   });
 
   it('PODCAST_TITLE defaults to Narratio', () => {

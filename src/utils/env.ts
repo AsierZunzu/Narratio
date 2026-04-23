@@ -46,6 +46,17 @@ export const env = {
 
   // Server
   PORT: () => num('PORT', 3000),
+  BASE_URL: (): string | undefined => {
+    const raw = process.env['BASE_URL'];
+    if (raw === undefined || raw === '') return undefined;
+    try {
+      // Validate — throws TypeError if malformed
+      new URL(raw);
+    } catch {
+      throw new Error(`Env var BASE_URL must be a valid URL, got: ${raw}`);
+    }
+    return raw.replace(/\/+$/, '');
+  },
   PODCAST_TITLE: () => str('PODCAST_TITLE', 'Narratio'),
   PODCAST_DESCRIPTION: () => str('PODCAST_DESCRIPTION', ''),
   PODCAST_AUTHOR: () => str('PODCAST_AUTHOR', 'Narratio Worker'),

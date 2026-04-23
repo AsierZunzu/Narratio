@@ -55,6 +55,10 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 
 `src/server/ui.ts` — serves an EJS-rendered admin/status page. Templates live in `src/server/templates/` and must be copied to `dist/server/templates/` at build time (handled by the build script).
 
+#### BASE_URL and reverse-proxy handling
+
+`BASE_URL` is optional. When unset, the server derives the public base URL per-request from `req.protocol` + `Host` header. `app.set('trust proxy', true)` is enabled so `X-Forwarded-Proto` from a reverse proxy (Nginx/Traefik/Caddy) is honored. Set `BASE_URL` explicitly only when the external URL differs from what Node sees (e.g. subpath rewrites or non-forwarded hostnames). `env.BASE_URL()` validates the URL with `new URL()` and strips trailing slashes. A `getBaseUrl(req)` helper in `src/server/index.ts` centralises the `env.BASE_URL() ?? derive-from-req` logic.
+
 ### Utilities
 
 - `src/utils/env.ts` — typed env accessor functions (call as `env.RSS_URL()`, etc.). Most vars return a hardcoded default when unset; `RSS_URL` and `POLL_INTERVAL` return `undefined`. `MAX_AUDIO_FILES` and `MAX_AUDIO_SIZE_MB` throw only when set to a non-numeric or negative value.
