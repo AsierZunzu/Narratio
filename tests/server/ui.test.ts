@@ -274,21 +274,21 @@ describe('POST /api/articles/:guid/regenerate', () => {
 });
 
 describe('GET /audio/:file', () => {
-  it('returns 400 for filename containing ..', async () => {
+  it('returns 404 for filename containing ..', async () => {
     resetDb();
     const { dbPath } = makeTempDb();
     const app = createApp(dbPath);
     // Express normalises /audio/../x to /x, so use a param that contains .. literally
     const res = await request(app).get('/audio/..hidden.wav');
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
   });
 
-  it('returns 400 for filename with slash', async () => {
+  it('returns 404 for filename with slash', async () => {
     resetDb();
     const { dbPath } = makeTempDb();
     const app = createApp(dbPath);
     const res = await request(app).get('/audio/subdir%2Ffile.wav');
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
   });
 
   it('returns 404 when audio file does not exist', async () => {
