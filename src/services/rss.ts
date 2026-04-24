@@ -60,7 +60,7 @@ function extractImageUrl(item: FeedItem): string | null {
   if (enclosure?.url) return enclosure.url;
 
   // Inline <img> in content
-  const html = item.content ?? item['content:encoded'] ?? '';
+  const html = item['content:encoded'] ?? item.content ?? '';
   const imgMatch = /<img[^>]+src=["']([^"']+)["']/i.exec(html);
   if (imgMatch?.[1]) return imgMatch[1];
 
