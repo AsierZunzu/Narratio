@@ -920,7 +920,7 @@
       words: 'col-words', 'tts-time': 'col-tts-time', retries: 'col-retries',
     };
     const COL_TYPE = {
-      title: 'str', status: 'str', date: 'str',
+      title: 'str', status: 'str', date: 'date',
       words: 'num', 'tts-time': 'num', retries: 'num',
     };
 
@@ -938,6 +938,11 @@
         if (type === 'num') {
           va = parseFloat(va);
           vb = parseFloat(vb);
+          if (isNaN(va)) va = -Infinity;
+          if (isNaN(vb)) vb = -Infinity;
+        } else if (type === 'date') {
+          va = Date.parse(va);
+          vb = Date.parse(vb);
           if (isNaN(va)) va = -Infinity;
           if (isNaN(vb)) vb = -Infinity;
         }
