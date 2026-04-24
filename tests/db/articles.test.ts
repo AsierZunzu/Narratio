@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { eq } from 'drizzle-orm';
 import * as schema from '../../src/db/schema.js';
+import { articles } from '../../src/db/schema.js';
 import { TEST_SCHEMA_SQL as SCHEMA_SQL } from '../helpers/schema.js';
 import {
   insertArticle,
@@ -13,6 +15,7 @@ import {
   getPendingArticles,
   getRetryableArticles,
   getPublishedArticles,
+  requeueArticleForTts,
 } from '../../src/db/articles.js';
 
 function makeDb() {
@@ -91,6 +94,78 @@ describe('markArticlePurged', () => {
     const row = getArticleByGuid(db, BASE_ARTICLE.guid);
     expect(row?.status).toBe('purged');
     expect(row?.audio_file).toBeNull();
+  });
+});
+
+describe('requeueArticleForTts', () => {
+  it('resets a done article to pending and returns its audio_file', () => {
+    const db = makeDb();
+    insertArticle(db, BASE_ARTICLE);
+    markArticleDone(db, BASE_ARTICLE.guid, 'a.wav', 1234);
+    db.update(articles).set({ tts_retries: 2 }).where(eq(articles.guid, BASE_ARTICLE.guid)).run();
+
+    const result = requeueArticleForTts(db, BASE_ARTICLE.guid);
+    expect(result).toEqual({ audio_file: 'a.wav' });
+
+    const row = getArticleByGuid(db, BASE_ARTICLE.guid);
+    expect(row?.status).toBe('pending');
+    expect(row?.audio_file).toBeNull();
+    expect(row?.tts_retries).toBe(0);
+    expect(row?.error).toBeNull();
+    expect(row?.tts_elapsed_ms).toBeNull();
+  });
+
+  it('resets a purged article to pending with null audio_file', () => {
+    const db = makeDb();
+    insertArticle(db, BASE_ARTICLE);
+    markArticleDone(db, BASE_ARTICLE.guid, 'a.wav', 500);
+    markArticlePurged(db, BASE_ARTICLE.guid);
+
+    const result = requeueArticleForTts(db, BASE_ARTICLE.guid);
+    expect(result).toEqual({ audio_file: null });
+
+    const row = getArticleByGuid(db, BASE_ARTICLE.guid);
+    expect(row?.status).toBe('pending');
+    expect(row?.audio_file).toBeNull();
+    expect(row?.tts_retries).toBe(0);
+    expect(row?.error).toBeNull();
+    expect(row?.tts_elapsed_ms).toBeNull();
+  });
+
+  it('resets a failed article to pending and clears the error', () => {
+    const db = makeDb();
+    insertArticle(db, BASE_ARTICLE);
+    db.update(articles)
+      .set({ status: 'failed', error: 'boom', tts_retries: 5 })
+      .where(eq(articles.guid, BASE_ARTICLE.guid))
+      .run();
+
+    const result = requeueArticleForTts(db, BASE_ARTICLE.guid);
+    expect(result).toEqual({ audio_file: null });
+
+    const row = getArticleByGuid(db, BASE_ARTICLE.guid);
+    expect(row?.status).toBe('pending');
+    expect(row?.error).toBeNull();
+    expect(row?.tts_retries).toBe(0);
+    expect(row?.tts_elapsed_ms).toBeNull();
+  });
+
+  it('returns null and does not change a converting article', () => {
+    const db = makeDb();
+    insertArticle(db, BASE_ARTICLE);
+    db.update(articles).set({ status: 'converting' }).where(eq(articles.guid, BASE_ARTICLE.guid)).run();
+
+    const result = requeueArticleForTts(db, BASE_ARTICLE.guid);
+    expect(result).toBeNull();
+
+    const row = getArticleByGuid(db, BASE_ARTICLE.guid);
+    expect(row?.status).toBe('converting');
+  });
+
+  it('returns null for an unknown guid', () => {
+    const db = makeDb();
+    const result = requeueArticleForTts(db, 'does-not-exist');
+    expect(result).toBeNull();
   });
 });
 

@@ -69,6 +69,8 @@
     .btn-delete:hover { background: #991b1b; }
     .btn-audio  { background: #14532d; color: #86efac; }
     .btn-audio:hover  { background: #166534; }
+    .btn-regen   { background: #1e3a2f; color: #86efac; }
+    .btn-regen:hover { background: #15803d; }
     .btn-primary { background: #1d4ed8; color: #bfdbfe; }
     .btn-primary:hover { background: #1e40af; }
     .btn-edit { background: #1e2535; color: #94a3b8; }
@@ -200,6 +202,9 @@
                   <% } %>
                   <% if (a.status === 'done') { %>
                     <button class="btn btn-purge" data-action="purge" data-guid="<%= a.guid %>">Purge</button>
+                  <% } %>
+                  <% if (a.status === 'done' || a.status === 'purged') { %>
+                    <button class="btn btn-regen" data-action="regenerate" data-guid="<%= a.guid %>">Regenerate</button>
                   <% } %>
                   <% if (a.status === 'done' && a.audio_file) { %>
                     <a class="btn btn-audio" href="<%= baseUrl %>/audio/<%= encodeURIComponent(a.audio_file) %>">▶ Audio</a>
@@ -881,11 +886,18 @@
         recalcCounts();
         return;
       }
-      const newStatus = action === 'retry' ? 'pending' : 'purged';
+      const newStatus = action === 'retry' || action === 'regenerate' ? 'pending' : 'purged';
       row.dataset.status = newStatus;
       row.querySelector('.col-status').innerHTML = `<span class="badge badge-${newStatus}">${STATUS_LABELS[newStatus]}</span>`;
       if (action === 'retry') {
         btn.remove();
+        row.querySelector('.col-error').innerHTML = '';
+        row.querySelector('.col-tts-time').textContent = '—';
+        row.querySelector('.col-retries').textContent = '—';
+      } else if (action === 'regenerate') {
+        row.querySelector('[data-action="regenerate"]')?.remove();
+        row.querySelector('[data-action="purge"]')?.remove();
+        row.querySelector('.btn-audio')?.remove();
         row.querySelector('.col-error').innerHTML = '';
         row.querySelector('.col-tts-time').textContent = '—';
         row.querySelector('.col-retries').textContent = '—';
@@ -981,6 +993,7 @@
       if (a.link) actions += `<a class="btn btn-link" href="${escAttr(a.link)}" target="_blank" rel="noopener">↗ Article</a> `;
       if (a.status === 'failed') actions += `<button class="btn btn-retry" data-action="retry" data-guid="${escAttr(a.guid)}">Retry</button> `;
       if (a.status === 'done') actions += `<button class="btn btn-purge" data-action="purge" data-guid="${escAttr(a.guid)}">Purge</button> `;
+      if (a.status === 'done' || a.status === 'purged') actions += `<button class="btn btn-regen" data-action="regenerate" data-guid="${escAttr(a.guid)}">Regenerate</button> `;
       if (a.status === 'done' && a.audio_file) actions += `<a class="btn btn-audio" href="${BASE_URL}/audio/${encodeURIComponent(a.audio_file)}">▶ Audio</a> `;
       actions += `<button class="btn btn-delete" data-action="delete" data-guid="${escAttr(a.guid)}">Delete</button>`;
 
@@ -1038,6 +1051,7 @@
           if (article.link) actions += `<a class="btn btn-link" href="${escAttr(article.link)}" target="_blank" rel="noopener">↗ Article</a> `;
           if (article.status === 'failed') actions += `<button class="btn btn-retry" data-action="retry" data-guid="${escAttr(article.guid)}">Retry</button> `;
           if (article.status === 'done') actions += `<button class="btn btn-purge" data-action="purge" data-guid="${escAttr(article.guid)}">Purge</button> `;
+          if (article.status === 'done' || article.status === 'purged') actions += `<button class="btn btn-regen" data-action="regenerate" data-guid="${escAttr(article.guid)}">Regenerate</button> `;
           if (article.status === 'done' && article.audio_file) actions += `<a class="btn btn-audio" href="${BASE_URL}/audio/${encodeURIComponent(article.audio_file)}">▶ Audio</a> `;
           actions += `<button class="btn btn-delete" data-action="delete" data-guid="${escAttr(article.guid)}">Delete</button>`;
           existing.querySelector('.col-actions').innerHTML = actions;
@@ -1124,6 +1138,7 @@
       if (!btn) return;
       const { action, guid } = btn.dataset;
       if (action === 'delete' && !confirm('Delete this article permanently?')) return;
+      if (action === 'regenerate' && !confirm('Regenerate audio for this article? The current audio file will be deleted and TTS will run again on the next worker poll.')) return;
 
       const row = btn.closest('tr[data-guid]');
       btn.disabled = true;
@@ -1134,7 +1149,8 @@
           showToast('Error: ' + await res.text(), true);
           btn.disabled = false;
         } else {
-          showToast(action.charAt(0).toUpperCase() + action.slice(1) + ' successful', false);
+          const toastMsg = action === 'regenerate' ? 'Regenerate queued' : action.charAt(0).toUpperCase() + action.slice(1) + ' successful';
+          showToast(toastMsg, false);
           applyAction(action, row, btn);
         }
       } catch {
