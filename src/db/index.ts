@@ -64,55 +64,12 @@ CREATE TABLE IF NOT EXISTS articles (
 let _sqlite: Database.Database | null = null;
 let _db: Db | null = null;
 
-function toSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default';
-}
-
-function seedFromEnv(sqlite: Database.Database): void {
+function seedDefaultTtsService(sqlite: Database.Database): void {
   const ttsCount = (sqlite.prepare('SELECT COUNT(*) as c FROM tts_services').get() as { c: number }).c;
   if (ttsCount === 0) {
     const host = process.env['PIPER_HOST'] || 'localhost';
     const port = Number(process.env['PIPER_PORT'] || '10200');
     sqlite.prepare('INSERT INTO tts_services (name, host, port) VALUES (?, ?, ?)').run('Default', host, port);
-  }
-
-  const feedCount = (sqlite.prepare('SELECT COUNT(*) as c FROM feeds').get() as { c: number }).c;
-  if (feedCount === 0) {
-    const rssUrl = process.env['RSS_URL'];
-    if (!rssUrl) return;
-
-    const ttsRow = sqlite.prepare('SELECT id FROM tts_services LIMIT 1').get() as { id: number };
-    const ttsServiceId = ttsRow.id;
-    const title = process.env['PODCAST_TITLE'] || 'Narratio';
-    const slug = toSlug(title);
-    const maxAudioFiles = process.env['MAX_AUDIO_FILES'] ? Number(process.env['MAX_AUDIO_FILES']) : null;
-    const maxAudioSizeMb = process.env['MAX_AUDIO_SIZE_MB'] ? Number(process.env['MAX_AUDIO_SIZE_MB']) : null;
-
-    sqlite.prepare(`
-      INSERT INTO feeds (
-        name, rss_url, slug, title, description, author, language,
-        itunes_author, itunes_summary, itunes_owner_name, itunes_owner_email, itunes_category,
-        unavailable_message, tts_failed_message, max_audio_files, max_audio_size_mb, tts_service_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      title, rssUrl, slug, title,
-      process.env['PODCAST_DESCRIPTION'] || '',
-      process.env['PODCAST_AUTHOR'] || 'Narratio Worker',
-      process.env['PODCAST_LANGUAGE'] || 'en',
-      process.env['PODCAST_ITUNES_AUTHOR'] || process.env['PODCAST_AUTHOR'] || 'Narratio Worker',
-      process.env['PODCAST_ITUNES_SUMMARY'] || process.env['PODCAST_DESCRIPTION'] || '',
-      process.env['PODCAST_ITUNES_OWNER_NAME'] || process.env['PODCAST_AUTHOR'] || 'Narratio Worker',
-      process.env['PODCAST_ITUNES_OWNER_EMAIL'] || 'worker@example.com',
-      process.env['PODCAST_ITUNES_CATEGORY'] || 'Technology',
-      process.env['UNAVAILABLE_MESSAGE'] || 'This content is no longer available on the server.',
-      process.env['TTS_FAILED_MESSAGE'] || 'This podcast episode could not be generated due to a text-to-speech error.',
-      maxAudioFiles,
-      maxAudioSizeMb,
-      ttsServiceId,
-    );
-
-    const feedRow = sqlite.prepare('SELECT id FROM feeds WHERE slug = ?').get(slug) as { id: number };
-    sqlite.prepare('UPDATE articles SET feed_id = ? WHERE feed_url = ?').run(feedRow.id, rssUrl);
   }
 }
 
@@ -133,7 +90,7 @@ export function getDb(dbPath?: string): Db {
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }
 
-  seedFromEnv(_sqlite);
+  seedDefaultTtsService(_sqlite);
 
   _db = drizzle(_sqlite, { schema });
   return _db;

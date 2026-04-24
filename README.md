@@ -29,7 +29,7 @@ A single `narratio` container runs both processes, sharing a SQLite database and
 **1. Copy and edit the config:**
 
 ```bash
-cp .env.example .env
+cp .env.dist .env
 ```
 
 Set at minimum:
@@ -62,7 +62,7 @@ Open the dashboard at `http://your-server:3000`.
 
 ## Configuration
 
-All configuration is via environment variables. Copy `.env.example` to `.env` and adjust.
+All configuration is via environment variables. Copy `.env.dist` to `.env` and adjust.
 
 ### Worker
 
