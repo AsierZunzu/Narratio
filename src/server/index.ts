@@ -6,7 +6,7 @@ import net from 'net';
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderDashboard } from './ui.js';
-import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid } from '../db/articles.js';
+import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, requeueArticleForTts } from '../db/articles.js';
 import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeedWithArticles, countFeedsByTtsService } from '../db/feeds.js';
 import { getTtsServices, getTtsServiceById, insertTtsService, updateTtsService, deleteTtsService } from '../db/tts-services.js';
 import { synthesise } from '../services/tts.js';
@@ -161,6 +161,20 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
     if (!updated) {
       res.status(404).send('Article not found or not in failed state');
       return;
+    }
+    res.status(204).end();
+  });
+
+  app.post('/api/articles/:guid/regenerate', (req, res) => {
+    const { guid } = req.params;
+    const result = requeueArticleForTts(db, guid);
+    if (!result) {
+      res.status(404).send('Article not found or not in a re-queueable state');
+      return;
+    }
+    if (result.audio_file) {
+      const filePath = path.join(audioDir, result.audio_file);
+      try { fs.unlinkSync(filePath); } catch { /* already gone */ }
     }
     res.status(204).end();
   });

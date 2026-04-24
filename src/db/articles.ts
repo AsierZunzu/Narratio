@@ -169,3 +169,15 @@ export function resetArticleRetries(db: Db, guid: string): boolean {
     .run();
   return result.changes > 0;
 }
+
+export function requeueArticleForTts(db: Db, guid: string): { audio_file: string | null } | null {
+  const row = db.select({ audio_file: articles.audio_file, status: articles.status })
+    .from(articles).where(eq(articles.guid, guid)).get();
+  if (!row) return null;
+  if (!['done', 'purged', 'failed'].includes(row.status)) return null;
+  db.update(articles)
+    .set({ status: 'pending', audio_file: null, error: null, tts_retries: 0, tts_elapsed_ms: null })
+    .where(eq(articles.guid, guid))
+    .run();
+  return { audio_file: row.audio_file };
+}

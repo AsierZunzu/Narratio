@@ -9,7 +9,9 @@ import fs from 'fs';
 import path from 'path';
 import { createApp } from '../../src/server/index.js';
 import { renderDashboard } from '../../src/server/ui.js';
-import { insertArticle, markArticleDone, markArticleFailed } from '../../src/db/articles.js';
+import { eq } from 'drizzle-orm';
+import { articles } from '../../src/db/schema.js';
+import { insertArticle, markArticleDone, markArticleFailed, markArticlePurged } from '../../src/db/articles.js';
 import { insertFeed } from '../../src/db/feeds.js';
 import { insertTtsService } from '../../src/db/tts-services.js';
 import { getDb, resetDb } from '../../src/db/index.js';
@@ -172,6 +174,107 @@ describe('POST /api/articles/:guid/purge', () => {
     const { dbPath } = makeTempDb();
     const app = createApp(dbPath);
     const res = await request(app).post('/api/articles/nobody/purge');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /api/articles/:guid/regenerate', () => {
+  it('returns 204, unlinks audio file, and resets done article to pending', async () => {
+    resetDb();
+    const { db, dbPath } = makeTempDb();
+    insertArticle(db, { guid: 'reg1', feed_url: 'https://x.com/feed', title: 'Regen Me', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'reg1', 'reg1.wav', 1500);
+    db.update(articles).set({ tts_retries: 2 }).where(eq(articles.guid, 'reg1')).run();
+    db.$client.close();
+
+    const audioDir = path.join(process.cwd(), 'data', 'audio');
+    fs.mkdirSync(audioDir, { recursive: true });
+    const filePath = path.join(audioDir, 'reg1.wav');
+    fs.writeFileSync(filePath, Buffer.from('RIFF'));
+
+    try {
+      const app = createApp(dbPath);
+      const res = await request(app).post('/api/articles/reg1/regenerate');
+      expect(res.status).toBe(204);
+      expect(fs.existsSync(filePath)).toBe(false);
+
+      const check = await request(app).get('/api/articles');
+      const article = check.body.find((a: { guid: string }) => a.guid === 'reg1');
+      expect(article?.status).toBe('pending');
+      expect(article?.audio_file).toBeNull();
+      expect(article?.tts_retries).toBe(0);
+      expect(article?.error).toBeNull();
+      expect(article?.tts_elapsed_ms).toBeNull();
+    } finally {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+  });
+
+  it('returns 204 for a purged article even when the audio file does not exist', async () => {
+    resetDb();
+    const { db, dbPath } = makeTempDb();
+    insertArticle(db, { guid: 'reg2', feed_url: 'https://x.com/feed', title: 'Purged', link: null, pub_date: null, content: null, image_url: null });
+    markArticleDone(db, 'reg2', 'reg2.wav', 0);
+    markArticlePurged(db, 'reg2');
+    db.$client.close();
+
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/articles/reg2/regenerate');
+    expect(res.status).toBe(204);
+
+    const check = await request(app).get('/api/articles');
+    const article = check.body.find((a: { guid: string }) => a.guid === 'reg2');
+    expect(article?.status).toBe('pending');
+    expect(article?.audio_file).toBeNull();
+  });
+
+  it('returns 204 for a failed article and clears the error', async () => {
+    resetDb();
+    const { db, dbPath } = makeTempDb();
+    insertArticle(db, { guid: 'reg3', feed_url: 'https://x.com/feed', title: 'Failed', link: null, pub_date: null, content: null, image_url: null });
+    markArticleFailed(db, 'reg3', 'some error');
+    markArticleFailed(db, 'reg3', 'again');
+    db.$client.close();
+
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/articles/reg3/regenerate');
+    expect(res.status).toBe(204);
+
+    const check = await request(app).get('/api/articles');
+    const article = check.body.find((a: { guid: string }) => a.guid === 'reg3');
+    expect(article?.status).toBe('pending');
+    expect(article?.error).toBeNull();
+    expect(article?.tts_retries).toBe(0);
+  });
+
+  it('returns 404 for a pending article', async () => {
+    resetDb();
+    const { db, dbPath } = makeTempDb();
+    insertArticle(db, { guid: 'reg4', feed_url: 'https://x.com/feed', title: 'Pending', link: null, pub_date: null, content: null, image_url: null });
+    db.$client.close();
+
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/articles/reg4/regenerate');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for a converting article', async () => {
+    resetDb();
+    const { db, dbPath } = makeTempDb();
+    insertArticle(db, { guid: 'reg5', feed_url: 'https://x.com/feed', title: 'Converting', link: null, pub_date: null, content: null, image_url: null });
+    db.update(articles).set({ status: 'converting' }).where(eq(articles.guid, 'reg5')).run();
+    db.$client.close();
+
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/articles/reg5/regenerate');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for an unknown guid', async () => {
+    resetDb();
+    const { dbPath } = makeTempDb();
+    const app = createApp(dbPath);
+    const res = await request(app).post('/api/articles/nobody/regenerate');
     expect(res.status).toBe(404);
   });
 });
