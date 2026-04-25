@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "lint:templates": "find src/server/templates -name '*.ejs' | xargs -I{} ejslint {}"
+    "lint:templates": "find src/server/templates -name '*.ejs' | xargs -I{} ejslint {}",
+    "lint:docker": "docker run --rm -v \"$(pwd):/work\" -w /work hadolint/hadolint hadolint Dockerfile"
   },
   "dependencies": {
     "@extractus/article-extractor": "^8.0.20",
