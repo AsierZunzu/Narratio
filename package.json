@@ -8,7 +8,8 @@
     "build": "tsc && cp -r src/server/templates dist/server/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "npm run lint:ts && npm run lint:templates && npm run lint:docker && npm run lint:js",
+    "lint:ts": "tsc --noEmit",
     "lint:templates": "find src/server/templates -name '*.ejs' | xargs -I{} ejslint {}",
     "lint:docker": "docker run --rm -v \"$(pwd):/work\" -w /work hadolint/hadolint hadolint Dockerfile",
     "lint:js": "eslint ."

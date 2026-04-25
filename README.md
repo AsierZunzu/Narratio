@@ -194,7 +194,7 @@ Both volumes are mounted from `./data` on the host.
 npm install
 npm run build      # TypeScript → dist/
 npm test           # Vitest unit tests
-npm run lint       # Type-check without emitting
+npm run lint       # Run all lint:* scripts (ts, templates, docker, js)
 ```
 
 Tests use in-memory SQLite and mock TCP servers — no Piper instance needed.
