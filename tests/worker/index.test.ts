@@ -115,11 +115,14 @@ beforeEach(() => {
   delete process.env['FORCE_RESET'];
   process.argv = ['node', 'worker'];
 
-  exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
-
   // resetAllMocks clears call history AND implementations (mockReturnValue/mockImplementation),
   // preventing a throwing mock from one test leaking into the next.
   vi.resetAllMocks();
+
+  // Spy on process.exit AFTER resetAllMocks so the no-op implementation isn't cleared.
+  // Vitest 4's default process.exit handling throws, which would surface as unhandled
+  // rejections from worker's top-level `main().catch(... process.exit(1))`.
+  exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
   mocks.fs.existsSync.mockReturnValue(false);
   mocks.fs.readdirSync.mockReturnValue([]);
   mocks.db.getDb.mockReturnValue({} as ReturnType<typeof import('../../src/db/index.js').getDb>);
