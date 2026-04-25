@@ -41,11 +41,12 @@ function buildFeedXml(items: Array<{ title: string; guid: string; content?: stri
 // We mock the rss-parser and synthesise at module level
 vi.mock('rss-parser', () => {
   const items: Array<Record<string, unknown>> = [];
-  const Parser = vi.fn().mockImplementation(() => ({
-    parseURL: vi.fn().mockResolvedValue({ items }),
-  }));
-  // Expose items array so tests can mutate it
-  (Parser as unknown as { _items: typeof items })._items = items;
+  class Parser {
+    static _items = items;
+    parseURL() {
+      return Promise.resolve({ items });
+    }
+  }
   return { default: Parser };
 });
 
