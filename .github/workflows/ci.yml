@@ -23,6 +23,7 @@ jobs:
     - run: npm ci
     - run: npm run lint
     - run: npm run lint:templates
+    - run: npm run lint:js
     - run: npm test
     - run: npm run build
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -14,7 +14,7 @@ import { articles } from '../../src/db/schema.js';
 import { insertArticle, markArticleDone, markArticleFailed, markArticlePurged } from '../../src/db/articles.js';
 import { insertFeed } from '../../src/db/feeds.js';
 import { insertTtsService } from '../../src/db/tts-services.js';
-import { getDb, resetDb } from '../../src/db/index.js';
+import { resetDb } from '../../src/db/index.js';
 import type { Db } from '../../src/db/index.js';
 import type { Article } from '../../src/db/schema.js';
 
@@ -25,12 +25,6 @@ function makeTempDb(): { db: Db; dbPath: string } {
   sqlite.exec(SCHEMA_SQL);
   const db = drizzle(sqlite, { schema });
   return { db, dbPath };
-}
-
-// Override AUDIO_DIR behaviour: the server uses process.cwd()/data/audio,
-// so we point it at a temp dir via a helper that creates the audio files.
-function makeTempAudioDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-audio-'));
 }
 
 // We need a way to seed audio files in the path the server will look for them.
