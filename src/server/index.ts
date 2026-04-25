@@ -68,23 +68,62 @@ function getBaseUrl(req: express.Request): string {
 export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Application {
   const app = express();
   const db = getDb(dbPath);
+  const audioRoot = path.resolve(path.join(process.cwd(), 'data', 'audio'));
 
   app.set('trust proxy', true);
   app.use(express.json());
 
-  app.get('/audio/:file', (req, res) => {
+  app.get('/audio/:file', async (req, res) => {
     const filename = req.params['file'];
-    if (!filename || filename.includes('..') || filename.includes('/')) {
-      res.status(400).send('Bad request');
+    const raw = req.params['file'];
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    const warn = (reason: string) =>
+      logger.warn(`audio request rejected: ${reason} file=${JSON.stringify(raw)} ip=${clientIp}`);
+
+    if (!filename) {
+      res.status(404).send('Not found');
       return;
     }
-    const filePath = path.join(audioDir, filename);
-    if (!fs.existsSync(filePath)) {
+    const safeName = path.basename(filename);
+    if (safeName.startsWith('.') || safeName !== filename) {
+      warn('bad_name');
+      res.status(404).send('Not found');
+      return;
+    }
+    const candidate = path.resolve(audioRoot, safeName);
+    if (!candidate.startsWith(audioRoot + path.sep)) {
+      warn('escape');
+      res.status(404).send('Not found');
+      return;
+    }
+    let real: string;
+    try {
+      real = await fs.promises.realpath(candidate);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        warn('realpath_error');
+      }
+      res.status(404).send('Not found');
+      return;
+    }
+    if (real !== audioRoot && !real.startsWith(audioRoot + path.sep)) {
+      warn('symlink_escape');
       res.status(404).send('Not found');
       return;
     }
     res.setHeader('Content-Type', 'audio/wav');
-    res.sendFile(filePath);
+    // dotfiles in the filename are rejected above via safeName check. Pass
+    // `allow` here so dotfile-named parent directories (e.g. `.claude/...`)
+    // in the absolute path don't trigger express-internal 403 responses.
+    res.sendFile(real, { dotfiles: 'allow' }, (err) => {
+      if (err) {
+        warn(`sendfile_error`);
+        if (!res.headersSent) {
+          res.status(404).send('Not found');
+        }
+      }
+    });
   });
 
   app.get('/rss/:slug', (req, res) => {
