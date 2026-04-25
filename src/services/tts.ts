@@ -73,7 +73,7 @@ export async function synthesise(
     // Accumulates bytes for the data section until fully received, then parsed.
     let pendingDataBuf = Buffer.alloc(0);
 
-    let audioInfo: AudioInfo = { rate: 22050, width: 2, channels: 1 };
+    const audioInfo: AudioInfo = { rate: 22050, width: 2, channels: 1 };
     const audioChunks: Buffer[] = [];
 
     const timeout = setTimeout(() => {

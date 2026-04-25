@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm run build        # tsc compile + copy EJS templates to dist/server/
-npm run lint         # type-check only (tsc --noEmit)
+npm run lint         # run all lint:* scripts (ts, templates, docker, js)
+npm run lint:ts      # type-check only (tsc --noEmit)
 npm test             # vitest run (all tests, single pass)
 npm run test:watch   # vitest in watch mode
 ```
@@ -90,6 +91,21 @@ Narratio converts RSS articles into a podcast feed with AI-generated audio. Two 
 - `audioChunks` — collected PCM (or raw audio) buffers assembled at settle time.
 
 **Error paths:** timeout (`TTS_TIMEOUT` seconds), connection refused, empty audio (Piper crash), Wyoming `error` event.
+
+## Git commit convention
+
+Format: `type(scope): short description in imperative mood, lowercase, no period`
+
+**Types:** `feat` · `fix` · `refactor` · `docs` · `test` · `chore` · `perf` · `style`
+
+**Scopes** (module names): `tts` · `rss` · `db` · `server` · `worker` · `ui` · `docker` · `feed`
+- Use a single scope; avoid compound scopes (`worker+server`) or milestone names (`stage4`)
+- Omit scope only for truly cross-cutting changes
+
+**Rules:**
+- Subject line ≤ 72 characters
+- `fix` for bug corrections, `refactor` for behaviour-neutral changes, `feat` for new capabilities
+- No trailing period
 
 ## Testing
 

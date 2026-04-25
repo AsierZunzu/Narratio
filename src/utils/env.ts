@@ -14,12 +14,6 @@ function num(key: string, defaultValue: number): number {
   return n;
 }
 
-function requireStr(key: string): string {
-  const val = process.env[key];
-  if (!val) throw new Error(`Required env var ${key} is not set`);
-  return val;
-}
-
 export const env = {
   // Worker
   POLL_INTERVAL: () => str('POLL_INTERVAL'),
