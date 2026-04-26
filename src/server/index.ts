@@ -16,6 +16,7 @@ import { logger } from '../utils/logger.js';
 const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
+const PUBLIC_DIR = path.join(process.cwd(), 'public');
 
 async function ensureFeedFallbackAudio(
   db: ReturnType<typeof getDb>,
@@ -71,6 +72,7 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
 
   app.set('trust proxy', true);
   app.use(express.json());
+  app.use(express.static(PUBLIC_DIR));
 
   app.get('/audio/:file', (req, res) => {
     const filename = req.params['file'];
