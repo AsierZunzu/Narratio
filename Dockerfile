@@ -20,6 +20,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY public/ ./public/
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
 RUN mkdir -p /app/data/audio && chown -R narratio:narratio /app/data \

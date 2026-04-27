@@ -1,5 +1,9 @@
 # Narratio
 
+<p align="center">
+  <img src="public/icon.png" alt="Narratio" width="160">
+</p>
+
 Self-hosted RSS-to-podcast. Fetches articles from any RSS feed, synthesises them into audio via [Piper TTS](https://github.com/rhasspy/piper), and serves a standards-compliant Podcast RSS feed that any podcast client (Pinepods, Pocket Casts, Overcast, etc.) can subscribe to.
 
 ---
