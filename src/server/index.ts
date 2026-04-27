@@ -4,10 +4,12 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import net from 'net';
+import { CronExpressionParser } from 'cron-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { getDb, closeDb } from '../db/index.js';
+import { getWorkerState } from '../db/worker-state.js';
 import { buildFeedXml } from './feed.js';
 import { renderLibrary, renderFeeds, renderVoices } from './ui.js';
 import { deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, requeueArticleForTts, getArticlesPage, getArticleStatusCounts, type ArticleStatusCounts } from '../db/articles.js';
@@ -229,6 +231,31 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
   });
 
   // ── REST API ────────────────────────────────────────────────────────────────
+
+  app.get('/api/worker/status', (_req, res) => {
+    try {
+      const state = getWorkerState(db);
+      const pollInterval = env.POLL_INTERVAL() ?? null;
+      if (state.status === 'running') {
+        res.json({ status: 'running', since: state.updated_at, pollInterval });
+        return;
+      }
+      let nextRunAt: string | null = null;
+      if (pollInterval) {
+        try {
+          const expr = CronExpressionParser.parse(pollInterval);
+          nextRunAt = expr.next().toDate().toISOString();
+        } catch (err) {
+          logger.warn(`Invalid POLL_INTERVAL cron expression: ${pollInterval} — ${err instanceof Error ? err.message : String(err)}`);
+          nextRunAt = null;
+        }
+      }
+      res.json({ status: 'idle', nextRunAt, pollInterval });
+    } catch (err) {
+      logger.error('Failed to read worker status', err);
+      res.json({ status: 'idle', nextRunAt: null, pollInterval: null });
+    }
+  });
 
   app.get('/api/articles', (req, res) => {
     const opts = parseArticlesQuery(req.query as Record<string, unknown>);
