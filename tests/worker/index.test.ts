@@ -72,6 +72,11 @@ vi.mock('../../src/db/index.js', () => ({
   resetDb: mocks.db.resetDb,
 }));
 
+vi.mock('../../src/db/worker-state.js', () => ({
+  setWorkerStatus: vi.fn(),
+  getWorkerState: vi.fn(() => ({ id: 1, status: 'idle', updated_at: '2026-04-27T00:00:00Z' })),
+}));
+
 vi.mock('../../src/db/articles.js', () => ({
   resetFailedRetries: mocks.articles.resetFailedRetries,
   resetConvertingArticles: mocks.articles.resetConvertingArticles,
