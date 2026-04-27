@@ -49,7 +49,15 @@ export const articles = sqliteTable('articles', {
   created_at:     text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
+export const workerState = sqliteTable('worker_state', {
+  id:         integer('id').primaryKey(),
+  status:     text('status', { enum: ['idle', 'running'] }).notNull().default('idle'),
+  updated_at: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
 export type TtsService = InferSelectModel<typeof ttsServices>;
 export type Feed = InferSelectModel<typeof feeds>;
 export type Article = InferSelectModel<typeof articles>;
 export type ArticleStatus = 'pending' | 'converting' | 'done' | 'failed' | 'purged';
+export type WorkerState = InferSelectModel<typeof workerState>;
+export type WorkerStatus = 'idle' | 'running';

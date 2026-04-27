@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import * as schema from './schema.js';
 
-export type { Article, ArticleStatus, Feed, TtsService } from './schema.js';
+export type { Article, ArticleStatus, Feed, TtsService, WorkerState, WorkerStatus } from './schema.js';
 export type Db = BetterSQLite3Database<typeof schema>;
 
 const TTS_SERVICES_SQL = `
@@ -39,6 +39,14 @@ CREATE TABLE IF NOT EXISTS feeds (
   max_audio_size_mb    INTEGER,
   tts_service_id       INTEGER NOT NULL REFERENCES tts_services(id),
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
+const WORKER_STATE_SQL = `
+CREATE TABLE IF NOT EXISTS worker_state (
+  id          INTEGER PRIMARY KEY,
+  status      TEXT NOT NULL DEFAULT 'idle',
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `;
 
@@ -86,6 +94,8 @@ export function getDb(dbPath?: string): Db {
   _sqlite.exec(TTS_SERVICES_SQL);
   _sqlite.exec(FEEDS_SQL);
   _sqlite.exec(ARTICLES_SQL);
+  _sqlite.exec(WORKER_STATE_SQL);
+  _sqlite.prepare("INSERT OR IGNORE INTO worker_state (id, status) VALUES (1, 'idle')").run();
 
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }

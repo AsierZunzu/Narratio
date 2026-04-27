@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS feeds (
   tts_service_id       INTEGER NOT NULL,
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS worker_state (
+  id          INTEGER PRIMARY KEY,
+  status      TEXT NOT NULL DEFAULT 'idle',
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO worker_state (id, status) VALUES (1, 'idle');
 CREATE TABLE IF NOT EXISTS articles (
   guid            TEXT PRIMARY KEY,
   feed_url        TEXT NOT NULL,
