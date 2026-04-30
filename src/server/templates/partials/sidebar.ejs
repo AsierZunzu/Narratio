@@ -1,0 +1,31 @@
+<aside class="sidebar" aria-label="Primary">
+  <div class="brand">
+    <div>
+      <div class="brand-mark">Narratio<span class="dot">.</span></div>
+      <div class="brand-tag">Editorial Console</div>
+    </div>
+  </div>
+
+  <nav class="nav-section" aria-label="Sections">
+    <div class="nav-section-title">Workspace</div>
+    <a href="/" class="nav-link <%= active === 'library' ? 'active' : '' %>" <%= active === 'library' ? 'aria-current="page"' : '' %>>
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span>Library</span>
+      <span class="nav-count"><%= counts.articles %></span>
+    </a>
+    <a href="/feeds" class="nav-link <%= active === 'feeds' ? 'active' : '' %>" <%= active === 'feeds' ? 'aria-current="page"' : '' %>>
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/></svg>
+      <span>Feeds</span>
+      <span class="nav-count"><%= counts.feeds %></span>
+    </a>
+    <a href="/voices" class="nav-link <%= active === 'voices' ? 'active' : '' %>" <%= active === 'voices' ? 'aria-current="page"' : '' %>>
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M7 8v8M17 8v8M3 11v2M21 11v2"/></svg>
+      <span>Voices</span>
+      <span class="nav-count"><%= counts.voices %></span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <span class="heartbeat" aria-hidden="true"></span> System Live
+  </div>
+</aside>

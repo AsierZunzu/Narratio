@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc && cp -r src/server/templates dist/server/",
+    "build": "tsc && cp -r src/server/templates dist/server/ && cp -r src/server/public dist/server/",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npm run lint:ts && npm run lint:templates && npm run lint:docker && npm run lint:js",

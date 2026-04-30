@@ -42,7 +42,7 @@ describe('GET /', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/html/);
     expect(res.text).toContain('Narratio');
-    expect(res.text).toContain('articles-table');
+    expect(res.text).toContain('dispatches');
   });
 });
 
@@ -393,7 +393,7 @@ describe('renderDashboard helper functions', () => {
   it('renders wordCount for HTML content', () => {
     const article = { ...baseArticle, content: '<p>one two three</p>' };
     const html = renderDashboard([article], 'http://localhost:3000');
-    expect(html).toContain('3 w');
+    expect(html).toMatch(/>3<\/span> words/);
   });
 
   it('renders wordCount as — for null content', () => {
@@ -412,9 +412,12 @@ describe('renderDashboard helper functions', () => {
     const statuses = ['pending', 'converting', 'done', 'failed', 'purged'] as const;
     const articles = statuses.map((status, i) => ({ ...baseArticle, guid: `g${i}`, status }));
     const html = renderDashboard(articles, 'http://localhost:3000');
+    const labels: Record<typeof statuses[number], string> = {
+      pending: 'Pending', converting: 'Converting',
+      done: 'Ready', failed: 'Failed', purged: 'Purged',
+    };
     for (const status of statuses) {
-      const label = status.charAt(0).toUpperCase() + status.slice(1);
-      expect(html).toContain(label);
+      expect(html).toContain(labels[status]);
     }
   });
 });

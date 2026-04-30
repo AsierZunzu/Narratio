@@ -1,0 +1,94 @@
+<header class="masthead">
+  <div class="masthead-title-block">
+    <div class="masthead-eyebrow">Vol. III — Voices</div>
+    <h1 class="masthead-title">The <em>narrators</em></h1>
+    <p class="masthead-subtitle">Wyoming-protocol TTS endpoints that bring text to sound.</p>
+  </div>
+  <div class="masthead-actions">
+    <button class="btn btn-primary" id="add-tts-btn" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span>New Voice</span>
+    </button>
+  </div>
+</header>
+
+<div class="resource-grid" id="tts-grid">
+  <% if (ttsServices.length === 0) { %>
+    <div class="empty-state" style="grid-column:1/-1">
+      No voices configured.
+      <div class="empty-state-detail">Connect a Piper TTS endpoint to begin narrating.</div>
+    </div>
+  <% } else { %>
+    <% ttsServices.forEach(function(svc) { %>
+      <article class="card" data-tts-id="<%= svc.id %>">
+        <header class="card-header">
+          <div style="min-width:0">
+            <div class="card-title"><%= svc.name %></div>
+            <div class="card-subtitle">Wyoming endpoint</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-sm" data-tts-edit="<%= svc.id %>" type="button">Edit</button>
+            <button class="btn btn-danger btn-sm" data-tts-delete="<%= svc.id %>" type="button" aria-label="Delete voice">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+            </button>
+          </div>
+        </header>
+        <div class="card-rows">
+          <div class="card-row">
+            <div class="card-row-label">Host</div>
+            <div class="card-row-value mono"><%= svc.host %></div>
+          </div>
+          <div class="card-row">
+            <div class="card-row-label">Port</div>
+            <div class="card-row-value mono"><%= svc.port %></div>
+          </div>
+        </div>
+      </article>
+    <% }); %>
+  <% } %>
+</div>
+
+<!-- TTS modal -->
+<div class="modal" id="tts-modal" role="dialog" aria-labelledby="tts-modal-title" aria-modal="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-panel">
+    <div class="modal-header">
+      <div>
+        <div class="modal-eyebrow" id="tts-modal-eyebrow">New voice</div>
+        <h2 class="modal-title" id="tts-modal-title">Add Voice</h2>
+      </div>
+      <button class="modal-close" type="button" data-modal-close aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
+    </div>
+    <form id="tts-form" autocomplete="off" novalidate>
+      <div class="modal-body">
+        <input type="hidden" id="tts-id" value="">
+        <div class="form-grid">
+          <div class="field full">
+            <label for="t-name">Name<span class="req">*</span></label>
+            <input id="t-name" name="name" required placeholder="Default Piper">
+          </div>
+          <div class="field">
+            <label for="t-host">Host<span class="req">*</span></label>
+            <input id="t-host" name="host" required placeholder="localhost">
+          </div>
+          <div class="field">
+            <label for="t-port">Port<span class="req">*</span></label>
+            <input id="t-port" name="port" type="number" required min="1" max="65535" placeholder="10200">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button type="button" class="btn" id="tts-test-btn">Test connection</button>
+          <span id="tts-test-result" class="test-result"></span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button type="button" class="btn btn-ghost" data-modal-close>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="tts-form-submit">Save Voice</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
