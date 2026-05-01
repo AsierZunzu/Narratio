@@ -16,6 +16,8 @@ import {
   getRetryableArticles,
   getPublishedArticles,
   requeueArticleForTts,
+  getArticlesPage,
+  getArticleStatusCounts,
 } from '../../src/db/articles.js';
 
 function makeDb() {
@@ -231,5 +233,77 @@ describe('getPublishedArticles', () => {
     expect(guids).toContain('g2');
     expect(guids).toContain('g3');
     expect(guids).not.toContain('g4');
+  });
+});
+
+describe('getArticlesPage / getArticleStatusCounts', () => {
+  function seed() {
+    const db = makeDb();
+    // 5 pending, 3 done, 2 failed, 1 purged
+    for (let i = 0; i < 5; i++) {
+      insertArticle(db, { guid: `p${i}`, feed_url: 'f', title: `Pending Apple ${i}`, link: null, pub_date: `2026-01-${String(10 + i).padStart(2, '0')}`, content: 'apple', image_url: null });
+    }
+    for (let i = 0; i < 3; i++) {
+      insertArticle(db, { guid: `d${i}`, feed_url: 'f', title: `Done Banana ${i}`, link: null, pub_date: `2026-02-${String(10 + i).padStart(2, '0')}`, content: 'banana', image_url: null });
+      markArticleDone(db, `d${i}`, `d${i}.wav`, 100);
+    }
+    for (let i = 0; i < 2; i++) {
+      insertArticle(db, { guid: `f${i}`, feed_url: 'f', title: `Failed ${i}`, link: null, pub_date: '2026-03-01', content: 'cherry', image_url: null });
+      markArticleFailed(db, `f${i}`, 'err');
+    }
+    insertArticle(db, { guid: 'pu1', feed_url: 'f', title: 'Purged Apple', link: null, pub_date: '2026-04-01', content: 'apple slice', image_url: null });
+    markArticlePurged(db, 'pu1');
+    return db;
+  }
+
+  it('paginates ordered results with limit and offset', () => {
+    const db = seed();
+    const page1 = getArticlesPage(db, { limit: 5, offset: 0 });
+    const page2 = getArticlesPage(db, { limit: 5, offset: 5 });
+    expect(page1).toHaveLength(5);
+    expect(page2).toHaveLength(5);
+    const ids1 = page1.map((a) => a.guid);
+    const ids2 = page2.map((a) => a.guid);
+    expect(ids1.some((g) => ids2.includes(g))).toBe(false);
+  });
+
+  it('filters by status', () => {
+    const db = seed();
+    const done = getArticlesPage(db, { status: 'done', limit: 100, offset: 0 });
+    expect(done).toHaveLength(3);
+    expect(done.every((a) => a.status === 'done')).toBe(true);
+  });
+
+  it('filters by case-insensitive search across title and content', () => {
+    const db = seed();
+    const matches = getArticlesPage(db, { search: 'APPLE', limit: 100, offset: 0 });
+    // 5 pending titled "Pending Apple ...", and 1 purged "Purged Apple"
+    expect(matches.length).toBe(6);
+  });
+
+  it('combines status and search', () => {
+    const db = seed();
+    const matches = getArticlesPage(db, { status: 'pending', search: 'apple', limit: 100, offset: 0 });
+    expect(matches).toHaveLength(5);
+  });
+
+  it('returns counts grouped by status', () => {
+    const db = seed();
+    const counts = getArticleStatusCounts(db);
+    expect(counts.all).toBe(11);
+    expect(counts.pending).toBe(5);
+    expect(counts.done).toBe(3);
+    expect(counts.failed).toBe(2);
+    expect(counts.purged).toBe(1);
+    expect(counts.converting).toBe(0);
+  });
+
+  it('counts honor the search filter', () => {
+    const db = seed();
+    const counts = getArticleStatusCounts(db, 'apple');
+    expect(counts.all).toBe(6);
+    expect(counts.pending).toBe(5);
+    expect(counts.purged).toBe(1);
+    expect(counts.done).toBe(0);
   });
 });

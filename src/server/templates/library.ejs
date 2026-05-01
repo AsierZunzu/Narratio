@@ -41,7 +41,7 @@
 </div>
 
 <div class="dispatches" id="dispatches">
-  <% if (articles.length === 0) { %>
+  <% if (counts.all === 0) { %>
     <div class="empty-state">
       The press is silent.
       <div class="empty-state-detail">No articles yet — your worker will populate this list after the next RSS poll.</div>
@@ -109,7 +109,19 @@
   <% } %>
 </div>
 
-<script>window.__FEED_MAP__ = <%- JSON.stringify(feedMap) %>;</script>
+<div class="dispatches-loading" id="dispatches-loading" hidden>Loading more dispatches…</div>
+<div class="dispatches-end" id="dispatches-end" hidden>End of archive.</div>
+<div id="dispatches-sentinel" aria-hidden="true"></div>
+
+<script>
+  window.__FEED_MAP__ = <%- JSON.stringify(feedMap) %>;
+  window.__LIBRARY_CONFIG__ = {
+    pageSize: <%= pageSize %>,
+    initialCounts: <%- JSON.stringify(counts) %>,
+    initialLoaded: <%= articles.length %>,
+    initialHasMore: <%= articles.length === pageSize ? 'true' : 'false' %>,
+  };
+</script>
 
 <!-- Content reader -->
 <div class="modal" id="content-modal" role="dialog" aria-labelledby="content-title" aria-modal="true">

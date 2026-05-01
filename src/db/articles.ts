@@ -1,4 +1,4 @@
-import { eq, lt, inArray, and, asc, desc, sql, count, isNotNull } from 'drizzle-orm';
+import { eq, lt, inArray, and, asc, desc, sql, count, isNotNull, like, or, type SQL } from 'drizzle-orm';
 import type { Db, ArticleStatus } from './index.js';
 import { articles } from './schema.js';
 
@@ -147,6 +147,56 @@ export function getAllArticles(db: Db) {
   return db.select().from(articles)
     .orderBy(desc(articles.pub_date), desc(articles.created_at))
     .all();
+}
+
+export interface ArticlesPageOptions {
+  status?: ArticleStatus;
+  search?: string;
+  limit: number;
+  offset: number;
+}
+
+function buildArticlesFilter(opts: { status?: ArticleStatus; search?: string }): SQL | undefined {
+  const clauses: SQL[] = [];
+  if (opts.status) clauses.push(eq(articles.status, opts.status));
+  if (opts.search) {
+    const term = `%${opts.search.toLowerCase()}%`;
+    const titleMatch = like(sql`lower(${articles.title})`, term);
+    const contentMatch = like(sql`lower(${articles.content})`, term);
+    const matcher = or(titleMatch, contentMatch);
+    if (matcher) clauses.push(matcher);
+  }
+  if (clauses.length === 0) return undefined;
+  if (clauses.length === 1) return clauses[0];
+  return and(...clauses);
+}
+
+export function getArticlesPage(db: Db, opts: ArticlesPageOptions) {
+  const where = buildArticlesFilter(opts);
+  const base = db.select().from(articles);
+  const filtered = where ? base.where(where) : base;
+  return filtered
+    .orderBy(desc(articles.pub_date), desc(articles.created_at))
+    .limit(opts.limit)
+    .offset(opts.offset)
+    .all();
+}
+
+export type ArticleStatusCounts = Record<'all' | ArticleStatus, number>;
+
+export function getArticleStatusCounts(db: Db, search?: string): ArticleStatusCounts {
+  const where = buildArticlesFilter({ search });
+  const base = db.select({ status: articles.status, c: count() }).from(articles);
+  const filtered = where ? base.where(where) : base;
+  const rows = filtered.groupBy(articles.status).all();
+  const result: ArticleStatusCounts = {
+    all: 0, pending: 0, converting: 0, done: 0, failed: 0, purged: 0,
+  };
+  for (const r of rows) {
+    if (r.status in result) result[r.status as ArticleStatus] = r.c;
+    result.all += r.c;
+  }
+  return result;
 }
 
 export function deleteArticle(db: Db, guid: string): boolean {
