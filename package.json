@@ -21,7 +21,7 @@
     "ejs": "^5.0.2",
     "express": "^5.2.1",
     "html-to-text": "^9.0.5",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "podcast": "^2.0.1",
     "rss-parser": "^3.13.0"
   },
