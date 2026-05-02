@@ -43,21 +43,21 @@ const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const ASSETS_DIR = path.join(__dirname, 'public');
 
 async function ensureFeedFallbackAudio(
-  db: ReturnType<typeof getDb>,
+  audioDir: string,
   feedId: number,
   ttsHost: string,
   ttsPort: number,
   unavailableText: string,
   ttsFailedText: string,
 ): Promise<void> {
-  fs.mkdirSync(AUDIO_DIR, { recursive: true });
-  const ttsOpts = { host: ttsHost, port: ttsPort, timeoutMs: env.TTS_TIMEOUT(), outputDir: AUDIO_DIR };
+  fs.mkdirSync(audioDir, { recursive: true });
+  const ttsOpts = { host: ttsHost, port: ttsPort, timeoutMs: env.TTS_TIMEOUT(), outputDir: audioDir };
   const fallbacks = [
     { filename: `unavailable-${feedId}.wav`, text: unavailableText },
     { filename: `tts-failed-${feedId}.wav`, text: ttsFailedText },
   ];
   for (const { filename, text } of fallbacks) {
-    const filePath = path.join(AUDIO_DIR, filename);
+    const filePath = path.join(audioDir, filename);
     if (!fs.existsSync(filePath)) {
       try {
         await synthesise(text, filename, ttsOpts);
@@ -69,14 +69,14 @@ async function ensureFeedFallbackAudio(
   }
 }
 
-async function ensureFallbackAudio(db: ReturnType<typeof getDb>): Promise<void> {
-  fs.mkdirSync(AUDIO_DIR, { recursive: true });
+async function ensureFallbackAudio(db: ReturnType<typeof getDb>, audioDir: string): Promise<void> {
+  fs.mkdirSync(audioDir, { recursive: true });
   const feedsList = getFeeds(db);
   for (const feed of feedsList) {
     const ttsService = getTtsServiceById(db, feed.tts_service_id);
     if (!ttsService) continue;
     await ensureFeedFallbackAudio(
-      db,
+      audioDir,
       feed.id,
       ttsService.host,
       ttsService.port,
@@ -93,7 +93,7 @@ function getBaseUrl(req: express.Request): string {
 export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Application {
   const app = express();
   const db = getDb(dbPath);
-  const audioRoot = path.resolve(path.join(process.cwd(), 'data', 'audio'));
+  const audioRoot = path.resolve(audioDir);
 
   app.set('trust proxy', true);
   app.use(express.json());
@@ -167,7 +167,7 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
         return;
       }
       ensureFeedFallbackAudio(
-        db, feed.id, ttsService.host, ttsService.port,
+        audioDir, feed.id, ttsService.host, ttsService.port,
         feed.unavailable_message ?? env.UNAVAILABLE_MESSAGE(),
         feed.tts_failed_message ?? env.TTS_FAILED_MESSAGE(),
       ).catch((err) => logger.warn(`Lazy fallback audio failed: ${err instanceof Error ? err.message : String(err)}`));
@@ -539,7 +539,7 @@ async function main(): Promise<void> {
         logger.info(`  RSS feed  : ${baseUrl}/rss/${feed.slug} (${feed.name})`);
       }
     }
-    ensureFallbackAudio(db).catch((err) =>
+    ensureFallbackAudio(db, AUDIO_DIR).catch((err) =>
       logger.warn(`Fallback audio generation failed: ${err instanceof Error ? err.message : String(err)}`),
     );
   });

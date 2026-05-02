@@ -44,7 +44,7 @@ function setupApp() {
   const { db, dbPath } = makeTempDb();
   seed(db);
   db.$client.close();
-  return createApp(dbPath);
+  return createApp(dbPath, path.join(tmpRoot, 'data', 'audio'));
 }
 
 const originalBaseUrl = process.env['BASE_URL'];

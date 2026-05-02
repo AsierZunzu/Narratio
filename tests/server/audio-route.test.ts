@@ -70,7 +70,7 @@ beforeEach(() => {
 describe('GET /audio/:file', () => {
   it('returns 200 for a normal file', async () => {
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/sample.wav');
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/audio\/wav/);
@@ -78,28 +78,28 @@ describe('GET /audio/:file', () => {
 
   it('returns 404 for percent-encoded traversal (..%2Fetc%2Fpasswd)', async () => {
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/..%2Fetc%2Fpasswd');
     expect(res.status).toBe(404);
   });
 
   it('returns 404 for nested path segments', async () => {
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/sub%2Ffile.wav');
     expect(res.status).toBe(404);
   });
 
   it('returns 404 for backslash in filename', async () => {
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/sub%5Cfile.wav');
     expect(res.status).toBe(404);
   });
 
   it('returns 404 for dotfile', async () => {
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/.hidden.wav');
     expect(res.status).toBe(404);
   });
@@ -107,7 +107,7 @@ describe('GET /audio/:file', () => {
   it('returns 404 for symlink that escapes audio dir', async () => {
     if (!externalSymlinkSupported) return;
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/escape.wav');
     expect(res.status).toBe(404);
   });
@@ -115,14 +115,14 @@ describe('GET /audio/:file', () => {
   it('returns 200 for internal symlink within audio dir', async () => {
     if (!symlinksSupported) return;
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/link.wav');
     expect(res.status).toBe(200);
   });
 
   it('returns 404 for missing file', async () => {
     const { dbPath } = makeTempDb();
-    const app = createApp(dbPath);
+    const app = createApp(dbPath, audioDir);
     const res = await request(app).get('/audio/does-not-exist.wav');
     expect(res.status).toBe(404);
   });
