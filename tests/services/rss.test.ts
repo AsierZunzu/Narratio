@@ -6,7 +6,7 @@ import { TEST_SCHEMA_SQL as SCHEMA_SQL } from '../helpers/schema.js';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import { processFeed } from '../../src/services/rss.js';
+import { processFeed, normalisePubDate } from '../../src/services/rss.js';
 import { getArticleByGuid } from '../../src/db/articles.js';
 import type { Db } from '../../src/db/index.js';
 
@@ -129,6 +129,50 @@ describe('processFeed', () => {
 
     const article = getArticleByGuid(db, 'g5');
     expect(article?.status).toBe('done');
+  });
+
+  it('stores pub_date as ISO 8601 so lexicographic order matches chronology', async () => {
+    setFeedItems([
+      { title: 'Older', guid: 'date-old', pubDate: 'Fri, 01 May 2026 09:00:00 GMT' },
+      { title: 'Newer', guid: 'date-new', pubDate: 'Mon, 04 May 2026 09:00:00 GMT' },
+    ]);
+    mockSynthesize.mockResolvedValue(path.join(tmpDir, 'x.wav'));
+
+    await processFeed(db, baseOpts());
+
+    const older = getArticleByGuid(db, 'date-old');
+    const newer = getArticleByGuid(db, 'date-new');
+    expect(older?.pub_date).toBe('2026-05-01T09:00:00.000Z');
+    expect(newer?.pub_date).toBe('2026-05-04T09:00:00.000Z');
+    // Lexicographic comparison must agree with chronology.
+    expect(newer!.pub_date! > older!.pub_date!).toBe(true);
+  });
+
+  it('prefers isoDate when both date fields present', async () => {
+    setFeedItems([
+      { title: 'A', guid: 'date-iso', pubDate: 'garbage', isoDate: '2026-05-02T12:00:00.000Z' },
+    ]);
+    mockSynthesize.mockResolvedValue(path.join(tmpDir, 'x.wav'));
+
+    await processFeed(db, baseOpts());
+
+    const a = getArticleByGuid(db, 'date-iso');
+    expect(a?.pub_date).toBe('2026-05-02T12:00:00.000Z');
+  });
+
+  describe('normalisePubDate', () => {
+    it('converts RFC 2822 to ISO 8601 UTC', () => {
+      expect(normalisePubDate('Mon, 02 May 2026 09:00:00 GMT')).toBe('2026-05-02T09:00:00.000Z');
+    });
+    it('passes ISO 8601 through unchanged in value', () => {
+      expect(normalisePubDate('2026-05-02T09:00:00.000Z')).toBe('2026-05-02T09:00:00.000Z');
+    });
+    it('returns null for missing or unparseable input', () => {
+      expect(normalisePubDate(null)).toBeNull();
+      expect(normalisePubDate(undefined)).toBeNull();
+      expect(normalisePubDate('')).toBeNull();
+      expect(normalisePubDate('not a date')).toBeNull();
+    });
   });
 
   it('permanently fails article after exhausting retries', async () => {

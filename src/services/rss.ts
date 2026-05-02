@@ -42,6 +42,18 @@ const parser = new Parser<CustomFeed, CustomItem>({
   },
 });
 
+/**
+ * Normalise a feed-item date to an ISO 8601 UTC string so lexicographic
+ * ordering matches chronological ordering. Returns null for missing or
+ * unparseable inputs.
+ */
+export function normalisePubDate(input: string | undefined | null): string | null {
+  if (!input) return null;
+  const t = Date.parse(input);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toISOString();
+}
+
 function extractImageUrl(item: FeedItem): string | null {
   // Priority: iTunes image → media:content → media:thumbnail → enclosure → inline <img>
   const itunesHref = item['itunes:image']?.['$']?.href;
@@ -157,7 +169,7 @@ export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void
       feed_id: opts.feedId,
       title: item.title ?? 'Untitled',
       link: item.link ?? null,
-      pub_date: item.pubDate ?? item.isoDate ?? null,
+      pub_date: normalisePubDate(item.isoDate ?? item.pubDate),
       content: content || null,
       image_url: imageUrl,
     });
