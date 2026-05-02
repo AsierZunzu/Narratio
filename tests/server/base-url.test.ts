@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -48,6 +48,31 @@ function setupApp() {
 }
 
 const originalBaseUrl = process.env['BASE_URL'];
+
+let tmpRoot: string;
+let origCwd: string;
+
+beforeAll(() => {
+  origCwd = process.cwd();
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'narratio-baseurl-cwd-'));
+  const audioDir = path.join(tmpRoot, 'data', 'audio');
+  fs.mkdirSync(audioDir, { recursive: true });
+  // Pre-create fallback WAVs so the /rss/:slug route's lazy
+  // ensureFeedFallbackAudio() short-circuits and never tries to reach a
+  // (nonexistent) TTS server, which would log async errors during teardown.
+  fs.writeFileSync(path.join(audioDir, 'unavailable-1.wav'), Buffer.from('RIFFxxxxWAVEdata'));
+  fs.writeFileSync(path.join(audioDir, 'tts-failed-1.wav'), Buffer.from('RIFFxxxxWAVEdata'));
+  process.chdir(tmpRoot);
+});
+
+afterAll(() => {
+  process.chdir(origCwd);
+  try {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+});
 
 afterEach(() => {
   if (originalBaseUrl === undefined) delete process.env['BASE_URL'];
