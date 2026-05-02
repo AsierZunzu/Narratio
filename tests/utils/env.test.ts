@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { env } from '../../src/utils/env.ts';
 
 const KEYS = [
-  'POLL_INTERVAL', 'PIPER_HOST', 'PIPER_PORT', 'TTS_TIMEOUT',
+  'POLL_INTERVAL', 'PIPER_SERVICES', 'TTS_TIMEOUT',
   'TTS_MAX_RETRIES', 'RSS_FETCH_TIMEOUT', 'MAX_AUDIO_FILES',
   'PORT', 'BASE_URL', 'UNAVAILABLE_MESSAGE', 'TTS_FAILED_MESSAGE',
 ];
@@ -31,27 +31,13 @@ describe('env', () => {
     expect(env.POLL_INTERVAL()).toBe('3600');
   });
 
-  it('PIPER_HOST defaults to localhost', () => {
-    expect(env.PIPER_HOST()).toBe('localhost');
+  it('PIPER_SERVICES throws when unset', () => {
+    expect(() => env.PIPER_SERVICES()).toThrow('PIPER_SERVICES');
   });
 
-  it('PIPER_HOST returns value when set', () => {
-    process.env.PIPER_HOST = 'tts-server';
-    expect(env.PIPER_HOST()).toBe('tts-server');
-  });
-
-  it('PIPER_PORT defaults to 10200', () => {
-    expect(env.PIPER_PORT()).toBe(10200);
-  });
-
-  it('PIPER_PORT returns numeric value when set', () => {
-    process.env.PIPER_PORT = '9999';
-    expect(env.PIPER_PORT()).toBe(9999);
-  });
-
-  it('PIPER_PORT throws on non-numeric value', () => {
-    process.env.PIPER_PORT = 'abc';
-    expect(() => env.PIPER_PORT()).toThrow('PIPER_PORT must be a number');
+  it('PIPER_SERVICES returns value when set', () => {
+    process.env.PIPER_SERVICES = 'localhost:10200,tts-2:10201';
+    expect(env.PIPER_SERVICES()).toBe('localhost:10200,tts-2:10201');
   });
 
   it('TTS_TIMEOUT defaults to 300000ms', () => {

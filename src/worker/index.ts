@@ -6,8 +6,9 @@ import type { Feed, TtsService } from '../db/index.js';
 import { resetFailedRetries, resetConvertingArticles, resetAllArticlesForRegen } from '../db/articles.js';
 import { setWorkerStatus } from '../db/worker-state.js';
 import { getFeeds } from '../db/feeds.js';
-import { getTtsServiceById } from '../db/tts-services.js';
+import { getTtsServiceById, getTtsServices, upsertTtsServiceByHostPort } from '../db/tts-services.js';
 import { processFeed, processPendingArticles } from '../services/rss.js';
+import { discoverService } from '../services/tts.js';
 import { runCleanup } from '../services/cleanup.js';
 import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
@@ -45,6 +46,37 @@ function buildCleanupOpts(feed: Feed) {
     maxAudioSizeMb: feed.max_audio_size_mb ?? Infinity,
     audioDir: AUDIO_DIR,
   };
+}
+
+async function seedTtsServices(): Promise<void> {
+  const raw = env.PIPER_SERVICES();
+  const endpoints = raw.split(',').map((s: string) => {
+    const trimmed = s.trim();
+    const lastColon = trimmed.lastIndexOf(':');
+    const host = trimmed.slice(0, lastColon);
+    const port = Number(trimmed.slice(lastColon + 1));
+    return { host, port };
+  });
+
+  const db = getDb(DB_PATH);
+
+  for (const { host, port } of endpoints) {
+    const info = await discoverService(host, port);
+    if (!info) {
+      logger.warn(`TTS service ${host}:${port} did not respond to discovery — skipping upsert`);
+      continue;
+    }
+    const svc = upsertTtsServiceByHostPort(db, host, port, info.voice, info.languages);
+    logger.info(`TTS service discovered: ${host}:${port} voice="${info.voice}" languages=${JSON.stringify(info.languages)} id=${svc.id}`);
+  }
+
+  const knownIds = new Set(getTtsServices(db).map((s) => s.id));
+  const feeds = getFeeds(db);
+  for (const feed of feeds) {
+    if (!knownIds.has(feed.tts_service_id)) {
+      logger.warn(`Feed "${feed.name}" references unknown TTS service id=${feed.tts_service_id}`);
+    }
+  }
 }
 
 let isRunning = false;
@@ -179,6 +211,8 @@ async function main(): Promise<void> {
 
   // Recover from any prior crash where status was left as 'running'.
   setWorkerStatus(getDb(DB_PATH), 'idle');
+
+  await seedTtsServices();
 
   // Run immediately on startup (reset any stale converting articles first)
   await runOnce(true);

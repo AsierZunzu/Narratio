@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS tts_services (
   name        TEXT NOT NULL,
   host        TEXT NOT NULL,
   port        INTEGER NOT NULL,
+  voice       TEXT,
+  languages   TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS feeds (

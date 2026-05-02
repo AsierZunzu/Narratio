@@ -28,6 +28,11 @@ const mocks = vi.hoisted(() => ({
   },
   ttsServices: {
     getTtsServiceById: vi.fn(() => null as ReturnType<typeof import('../../src/db/tts-services.js').getTtsServiceById>),
+    getTtsServices: vi.fn(() => [] as ReturnType<typeof import('../../src/db/tts-services.js').getTtsServices>),
+    upsertTtsServiceByHostPort: vi.fn(() => ({ id: 1, name: 'svc', host: 'localhost', port: 10200, voice: 'v', languages: '["en"]' } as ReturnType<typeof import('../../src/db/tts-services.js').upsertTtsServiceByHostPort>)),
+  },
+  tts: {
+    discoverService: vi.fn().mockResolvedValue({ voice: 'v', languages: ['en'] }),
   },
   rss: {
     processFeed: vi.fn().mockResolvedValue(undefined),
@@ -38,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   },
   env: {
     POLL_INTERVAL: vi.fn(() => undefined as string | undefined),
+    PIPER_SERVICES: vi.fn(() => 'localhost:10200'),
     TTS_MAX_RETRIES: vi.fn(() => 3),
     TTS_TIMEOUT: vi.fn(() => 300_000),
     RSS_FETCH_TIMEOUT: vi.fn(() => 30_000),
@@ -89,6 +95,12 @@ vi.mock('../../src/db/feeds.js', () => ({
 
 vi.mock('../../src/db/tts-services.js', () => ({
   getTtsServiceById: mocks.ttsServices.getTtsServiceById,
+  getTtsServices: mocks.ttsServices.getTtsServices,
+  upsertTtsServiceByHostPort: mocks.ttsServices.upsertTtsServiceByHostPort,
+}));
+
+vi.mock('../../src/services/tts.js', () => ({
+  discoverService: mocks.tts.discoverService,
 }));
 
 vi.mock('../../src/services/rss.js', () => ({
@@ -136,9 +148,13 @@ beforeEach(() => {
   mocks.articles.resetAllArticlesForRegen.mockReturnValue(0);
   mocks.feeds.getFeeds.mockReturnValue([]);
   mocks.ttsServices.getTtsServiceById.mockReturnValue(null);
+  mocks.ttsServices.getTtsServices.mockReturnValue([]);
+  mocks.ttsServices.upsertTtsServiceByHostPort.mockReturnValue({ id: 1, name: 'svc', host: 'localhost', port: 10200, voice: 'v', languages: '["en"]' } as ReturnType<typeof import('../../src/db/tts-services.js').upsertTtsServiceByHostPort>);
+  mocks.tts.discoverService.mockResolvedValue({ voice: 'v', languages: ['en'] });
   mocks.rss.processFeed.mockResolvedValue(undefined);
   mocks.rss.processPendingArticles.mockResolvedValue(undefined);
   mocks.env.POLL_INTERVAL.mockReturnValue(undefined);
+  mocks.env.PIPER_SERVICES.mockReturnValue('localhost:10200');
   mocks.env.TTS_MAX_RETRIES.mockReturnValue(3);
   mocks.env.TTS_TIMEOUT.mockReturnValue(300_000);
   mocks.env.RSS_FETCH_TIMEOUT.mockReturnValue(30_000);

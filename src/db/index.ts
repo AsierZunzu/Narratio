@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS tts_services (
   name        TEXT NOT NULL,
   host        TEXT NOT NULL,
   port        INTEGER NOT NULL,
+  voice       TEXT,
+  languages   TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `;
@@ -75,9 +77,13 @@ let _db: Db | null = null;
 function seedDefaultTtsService(sqlite: Database.Database): void {
   const ttsCount = (sqlite.prepare('SELECT COUNT(*) as c FROM tts_services').get() as { c: number }).c;
   if (ttsCount === 0) {
-    const host = process.env['PIPER_HOST'] || 'localhost';
-    const port = Number(process.env['PIPER_PORT'] || '10200');
-    sqlite.prepare('INSERT INTO tts_services (name, host, port) VALUES (?, ?, ?)').run('Default', host, port);
+    const piperServices = process.env['PIPER_SERVICES'];
+    if (piperServices) {
+      const first = piperServices.split(',')[0]!.trim();
+      const [host, portStr] = first.split(':');
+      const port = Number(portStr || '10200');
+      sqlite.prepare('INSERT INTO tts_services (name, host, port) VALUES (?, ?, ?)').run(`${host}:${port}`, host ?? 'localhost', port);
+    }
   }
 }
 
@@ -99,6 +105,8 @@ export function getDb(dbPath?: string): Db {
 
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }
+  try { _sqlite.exec('ALTER TABLE tts_services ADD COLUMN voice TEXT'); } catch { /* already exists */ }
+  try { _sqlite.exec('ALTER TABLE tts_services ADD COLUMN languages TEXT'); } catch { /* already exists */ }
 
   seedDefaultTtsService(_sqlite);
 
