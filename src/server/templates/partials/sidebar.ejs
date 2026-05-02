@@ -26,6 +26,10 @@
   </nav>
 
   <div class="sidebar-footer">
-    <span class="heartbeat" aria-hidden="true"></span> System Live
+    <div class="worker-status worker-status-idle" id="worker-status" role="status" aria-live="polite" title="Worker status">
+      <span class="worker-status-dot" aria-hidden="true"></span>
+      <span class="worker-status-label">Worker</span>
+      <span class="worker-status-detail" id="worker-status-detail">…</span>
+    </div>
   </div>
 </aside>
