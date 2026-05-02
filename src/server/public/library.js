@@ -198,6 +198,8 @@
     document.getElementById('content-title').textContent = title;
     document.getElementById('content-text').textContent = content;
     N.openModal('content-modal');
+    const body = document.getElementById('content-body');
+    if (body) body.scrollTop = 0;
   }
 
   list.addEventListener('click', (e) => {
