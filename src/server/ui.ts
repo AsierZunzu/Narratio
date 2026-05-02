@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ejs from 'ejs';
 import type { Article, Feed, TtsService } from '../db/index.js';
+import type { ArticleStatusCounts } from '../db/articles.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, 'templates');
@@ -66,22 +67,16 @@ function renderPage(opts: PageOptions): string {
 
 export function renderLibrary(
   articles: Article[],
+  counts: ArticleStatusCounts,
+  pageSize: number,
   baseUrl: string,
   feeds: Feed[],
   ttsServices: TtsService[],
 ): string {
-  const counts: Record<string, number> = {
-    all: articles.length,
-    pending: articles.filter((a) => a.status === 'pending').length,
-    converting: articles.filter((a) => a.status === 'converting').length,
-    done: articles.filter((a) => a.status === 'done').length,
-    failed: articles.filter((a) => a.status === 'failed').length,
-    purged: articles.filter((a) => a.status === 'purged').length,
-  };
   const feedMap = Object.fromEntries(feeds.map((f) => [f.id, f]));
 
   const body = ejs.render(readTemplate('library.ejs'), {
-    articles, counts, baseUrl, feedMap,
+    articles, counts, baseUrl, feedMap, pageSize,
     STATUS_LABELS, formatDate, formatElapsed, wordCount,
   });
 
@@ -90,7 +85,7 @@ export function renderLibrary(
     activeNav: 'library',
     pageScript: 'library.js',
     baseUrl,
-    navCounts: { articles: articles.length, feeds: feeds.length, voices: ttsServices.length },
+    navCounts: { articles: counts.all, feeds: feeds.length, voices: ttsServices.length },
     body,
   });
 }
@@ -142,5 +137,13 @@ export function renderDashboard(
   feeds: Feed[] = [],
   ttsServices: TtsService[] = [],
 ): string {
-  return renderLibrary(articles, baseUrl, feeds, ttsServices);
+  const counts: ArticleStatusCounts = {
+    all: articles.length,
+    pending: articles.filter((a) => a.status === 'pending').length,
+    converting: articles.filter((a) => a.status === 'converting').length,
+    done: articles.filter((a) => a.status === 'done').length,
+    failed: articles.filter((a) => a.status === 'failed').length,
+    purged: articles.filter((a) => a.status === 'purged').length,
+  };
+  return renderLibrary(articles, counts, articles.length, baseUrl, feeds, ttsServices);
 }

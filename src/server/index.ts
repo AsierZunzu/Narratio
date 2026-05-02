@@ -10,7 +10,26 @@ const __dirname = dirname(__filename);
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
 import { renderLibrary, renderFeeds, renderVoices } from './ui.js';
-import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, requeueArticleForTts } from '../db/articles.js';
+import { deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, requeueArticleForTts, getArticlesPage, getArticleStatusCounts, type ArticleStatusCounts } from '../db/articles.js';
+import type { ArticleStatus } from '../db/index.js';
+
+const ARTICLES_PAGE_SIZE = 50;
+const ARTICLES_PAGE_MAX = 200;
+const VALID_STATUSES: ReadonlyArray<ArticleStatus> = ['pending', 'converting', 'done', 'failed', 'purged'];
+
+function parseArticlesQuery(q: Record<string, unknown>): { status?: ArticleStatus; search?: string; limit: number; offset: number } {
+  const rawStatus = typeof q.status === 'string' ? q.status : undefined;
+  const status = rawStatus && (VALID_STATUSES as readonly string[]).includes(rawStatus) ? (rawStatus as ArticleStatus) : undefined;
+  const rawSearch = typeof q.search === 'string' ? q.search.trim() : '';
+  const search = rawSearch.length > 0 ? rawSearch : undefined;
+  const rawLimit = Number(q.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0
+    ? Math.min(Math.floor(rawLimit), ARTICLES_PAGE_MAX)
+    : ARTICLES_PAGE_SIZE;
+  const rawOffset = Number(q.offset);
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+  return { status, search, limit, offset };
+}
 import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeedWithArticles, countFeedsByTtsService } from '../db/feeds.js';
 import { getTtsServices, getTtsServiceById, insertTtsService, updateTtsService, deleteTtsService } from '../db/tts-services.js';
 import { synthesise } from '../services/tts.js';
@@ -166,10 +185,11 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
   app.get('/', (req, res) => {
     const baseUrl = getBaseUrl(req);
     try {
-      const articles = getAllArticles(db);
+      const articles = getArticlesPage(db, { limit: ARTICLES_PAGE_SIZE, offset: 0 });
+      const counts = getArticleStatusCounts(db);
       const feedsList = getFeeds(db);
       const ttsServicesList = getTtsServices(db);
-      const html = renderLibrary(articles, baseUrl, feedsList, ttsServicesList);
+      const html = renderLibrary(articles, counts, ARTICLES_PAGE_SIZE, baseUrl, feedsList, ttsServicesList);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } catch (err) {
@@ -183,7 +203,7 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
     try {
       const feedsList = getFeeds(db);
       const ttsServicesList = getTtsServices(db);
-      const articleCount = getAllArticles(db).length;
+      const articleCount = getArticleStatusCounts(db).all;
       const html = renderFeeds(baseUrl, feedsList, ttsServicesList, articleCount);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
@@ -198,7 +218,7 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
     try {
       const feedsList = getFeeds(db);
       const ttsServicesList = getTtsServices(db);
-      const articleCount = getAllArticles(db).length;
+      const articleCount = getArticleStatusCounts(db).all;
       const html = renderVoices(baseUrl, ttsServicesList, feedsList.length, articleCount);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
@@ -210,8 +230,23 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
 
   // ── REST API ────────────────────────────────────────────────────────────────
 
-  app.get('/api/articles', (_req, res) => {
-    res.json(getAllArticles(db));
+  app.get('/api/articles', (req, res) => {
+    const opts = parseArticlesQuery(req.query as Record<string, unknown>);
+    const articles = getArticlesPage(db, opts);
+    const counts = getArticleStatusCounts(db, opts.search);
+    res.json({
+      articles,
+      counts,
+      limit: opts.limit,
+      offset: opts.offset,
+      hasMore: articles.length === opts.limit,
+    });
+  });
+
+  app.get('/api/articles/counts', (req, res) => {
+    const rawSearch = typeof req.query['search'] === 'string' ? (req.query['search'] as string).trim() : '';
+    const counts: ArticleStatusCounts = getArticleStatusCounts(db, rawSearch.length > 0 ? rawSearch : undefined);
+    res.json(counts);
   });
 
   app.delete('/api/articles/:guid', (req, res) => {

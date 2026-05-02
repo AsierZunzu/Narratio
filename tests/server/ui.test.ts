@@ -53,7 +53,8 @@ describe('GET /api/articles', () => {
     const app = createApp(dbPath);
     const res = await request(app).get('/api/articles');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    expect(res.body.articles).toEqual([]);
+    expect(res.body.counts.all).toBe(0);
   });
 
   it('returns all articles as JSON', async () => {
@@ -66,8 +67,9 @@ describe('GET /api/articles', () => {
     const app = createApp(dbPath);
     const res = await request(app).get('/api/articles');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
-    expect(res.body.map((a: { guid: string }) => a.guid)).toContain('g1');
+    expect(res.body.articles).toHaveLength(2);
+    expect(res.body.articles.map((a: { guid: string }) => a.guid)).toContain('g1');
+    expect(res.body.counts.all).toBe(2);
   });
 });
 
@@ -84,7 +86,7 @@ describe('DELETE /api/articles/:guid', () => {
 
     // Verify removed
     const check = await request(app).get('/api/articles');
-    expect(check.body.find((a: { guid: string }) => a.guid === 'del1')).toBeUndefined();
+    expect(check.body.articles.find((a: { guid: string }) => a.guid === 'del1')).toBeUndefined();
   });
 
   it('returns 404 for unknown guid', async () => {
@@ -109,7 +111,7 @@ describe('POST /api/articles/:guid/retry', () => {
     expect(res.status).toBe(204);
 
     const check = await request(app).get('/api/articles');
-    const article = check.body.find((a: { guid: string }) => a.guid === 'ret1');
+    const article = check.body.articles.find((a: { guid: string }) => a.guid === 'ret1');
     expect(article?.status).toBe('pending');
     expect(article?.tts_retries).toBe(0);
   });
@@ -148,7 +150,7 @@ describe('POST /api/articles/:guid/purge', () => {
     expect(res.status).toBe(204);
 
     const check = await request(app).get('/api/articles');
-    const article = check.body.find((a: { guid: string }) => a.guid === 'pur1');
+    const article = check.body.articles.find((a: { guid: string }) => a.guid === 'pur1');
     expect(article?.status).toBe('purged');
   });
 
@@ -193,7 +195,7 @@ describe('POST /api/articles/:guid/regenerate', () => {
       expect(fs.existsSync(filePath)).toBe(false);
 
       const check = await request(app).get('/api/articles');
-      const article = check.body.find((a: { guid: string }) => a.guid === 'reg1');
+      const article = check.body.articles.find((a: { guid: string }) => a.guid === 'reg1');
       expect(article?.status).toBe('pending');
       expect(article?.audio_file).toBeNull();
       expect(article?.tts_retries).toBe(0);
@@ -217,7 +219,7 @@ describe('POST /api/articles/:guid/regenerate', () => {
     expect(res.status).toBe(204);
 
     const check = await request(app).get('/api/articles');
-    const article = check.body.find((a: { guid: string }) => a.guid === 'reg2');
+    const article = check.body.articles.find((a: { guid: string }) => a.guid === 'reg2');
     expect(article?.status).toBe('pending');
     expect(article?.audio_file).toBeNull();
   });
@@ -235,7 +237,7 @@ describe('POST /api/articles/:guid/regenerate', () => {
     expect(res.status).toBe(204);
 
     const check = await request(app).get('/api/articles');
-    const article = check.body.find((a: { guid: string }) => a.guid === 'reg3');
+    const article = check.body.articles.find((a: { guid: string }) => a.guid === 'reg3');
     expect(article?.status).toBe('pending');
     expect(article?.error).toBeNull();
     expect(article?.tts_retries).toBe(0);
