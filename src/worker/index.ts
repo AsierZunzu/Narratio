@@ -4,6 +4,7 @@ import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
 import type { Feed, TtsService } from '../db/index.js';
 import { resetFailedRetries, resetConvertingArticles, resetAllArticlesForRegen } from '../db/articles.js';
+import { setWorkerStatus } from '../db/worker-state.js';
 import { getFeeds } from '../db/feeds.js';
 import { getTtsServiceById } from '../db/tts-services.js';
 import { processFeed, processPendingArticles } from '../services/rss.js';
@@ -60,6 +61,7 @@ async function runOnce(isFirst = false): Promise<void> {
     const stuck = resetConvertingArticles(db);
     if (stuck > 0) logger.warn(`Reset ${stuck} stuck 'converting' articles to pending`);
   }
+  setWorkerStatus(db, 'running');
   try {
     const feeds = getFeeds(db);
     if (feeds.length === 0) {
@@ -78,6 +80,7 @@ async function runOnce(isFirst = false): Promise<void> {
   } catch (err) {
     logger.error('Worker run failed', err);
   } finally {
+    try { setWorkerStatus(db, 'idle'); } catch { /* db may be closed during shutdown */ }
     isRunning = false;
   }
 }
@@ -85,8 +88,9 @@ async function runOnce(isFirst = false): Promise<void> {
 async function runPendingCheck(): Promise<void> {
   if (isRunning) return;
   isRunning = true;
+  const db = getDb(DB_PATH);
+  setWorkerStatus(db, 'running');
   try {
-    const db = getDb(DB_PATH);
     const feeds = getFeeds(db);
     for (const feed of feeds) {
       const ttsService = getTtsServiceById(db, feed.tts_service_id);
@@ -96,6 +100,7 @@ async function runPendingCheck(): Promise<void> {
   } catch (err) {
     logger.error('Pending check failed', err);
   } finally {
+    try { setWorkerStatus(db, 'idle'); } catch { /* db may be closed during shutdown */ }
     isRunning = false;
   }
 }
@@ -171,6 +176,9 @@ async function main(): Promise<void> {
   process.on('SIGINT', shutdown);
 
   logger.info('Worker starting');
+
+  // Recover from any prior crash where status was left as 'running'.
+  setWorkerStatus(getDb(DB_PATH), 'idle');
 
   // Run immediately on startup (reset any stale converting articles first)
   await runOnce(true);

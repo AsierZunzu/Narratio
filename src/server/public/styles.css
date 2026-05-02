@@ -235,6 +235,45 @@ body::before {
   50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(184,201,122,0); }
 }
 
+.worker-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.worker-status .worker-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--signal-green);
+  flex-shrink: 0;
+}
+.worker-status-idle .worker-status-dot {
+  background: var(--signal-green);
+  animation: heartbeat 2s ease-in-out infinite;
+}
+.worker-status-running .worker-status-dot {
+  background: var(--signal-blue);
+  animation: worker-pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 0 2px var(--signal-blue-deep);
+}
+.worker-status-running { color: var(--signal-blue); }
+.worker-status-label { font-weight: 500; }
+.worker-status-detail {
+  color: var(--paper-4);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.worker-status-running .worker-status-detail { color: var(--signal-blue); }
+@keyframes worker-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Main */
 .main {
   min-width: 0;
