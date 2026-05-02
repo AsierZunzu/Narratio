@@ -307,3 +307,30 @@ describe('getArticlesPage / getArticleStatusCounts', () => {
     expect(counts.done).toBe(0);
   });
 });
+
+describe('normaliseLegacyPubDates', () => {
+  it('rewrites RFC 2822 dates in-place to ISO 8601 UTC', async () => {
+    const { normaliseLegacyPubDates } = await import('../../src/db/index.js');
+    const sqlite = new Database(':memory:');
+    sqlite.exec(SCHEMA_SQL);
+    sqlite.prepare(
+      "INSERT INTO articles (guid, feed_url, title, pub_date) VALUES (?, ?, ?, ?)",
+    ).run('legacy-1', 'https://example.com/feed', 'Old', 'Mon, 04 May 2026 09:00:00 GMT');
+    sqlite.prepare(
+      "INSERT INTO articles (guid, feed_url, title, pub_date) VALUES (?, ?, ?, ?)",
+    ).run('iso-1', 'https://example.com/feed', 'New', '2026-05-01T09:00:00.000Z');
+    sqlite.prepare(
+      "INSERT INTO articles (guid, feed_url, title, pub_date) VALUES (?, ?, ?, ?)",
+    ).run('garbage-1', 'https://example.com/feed', 'Bad', 'totally not a date');
+
+    normaliseLegacyPubDates(sqlite);
+
+    const rows = sqlite.prepare('SELECT guid, pub_date FROM articles ORDER BY guid').all() as Array<{ guid: string; pub_date: string }>;
+    const byGuid = Object.fromEntries(rows.map((r) => [r.guid, r.pub_date]));
+    expect(byGuid['legacy-1']).toBe('2026-05-04T09:00:00.000Z');
+    expect(byGuid['iso-1']).toBe('2026-05-01T09:00:00.000Z');
+    // Unparseable values are left alone, not silently corrupted.
+    expect(byGuid['garbage-1']).toBe('totally not a date');
+    sqlite.close();
+  });
+});

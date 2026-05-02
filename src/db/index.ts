@@ -72,6 +72,24 @@ CREATE TABLE IF NOT EXISTS articles (
 let _sqlite: Database.Database | null = null;
 let _db: Db | null = null;
 
+// Older rows stored RFC 2822 strings ("Mon, 02 May 2026 ...") which sort
+// lexicographically wrong. Rewrite anything that isn't already ISO 8601 UTC.
+export function normaliseLegacyPubDates(sqlite: Database.Database): void {
+  const rows = sqlite.prepare(
+    "SELECT guid, pub_date FROM articles WHERE pub_date IS NOT NULL AND pub_date NOT GLOB '____-__-__T*Z'",
+  ).all() as Array<{ guid: string; pub_date: string }>;
+  if (rows.length === 0) return;
+  const update = sqlite.prepare('UPDATE articles SET pub_date = ? WHERE guid = ?');
+  const tx = sqlite.transaction(() => {
+    for (const row of rows) {
+      const t = Date.parse(row.pub_date);
+      if (Number.isNaN(t)) continue;
+      update.run(new Date(t).toISOString(), row.guid);
+    }
+  });
+  tx();
+}
+
 function seedDefaultTtsService(sqlite: Database.Database): void {
   const ttsCount = (sqlite.prepare('SELECT COUNT(*) as c FROM tts_services').get() as { c: number }).c;
   if (ttsCount === 0) {
@@ -100,6 +118,7 @@ export function getDb(dbPath?: string): Db {
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }
 
+  normaliseLegacyPubDates(_sqlite);
   seedDefaultTtsService(_sqlite);
 
   _db = drizzle(_sqlite, { schema });
