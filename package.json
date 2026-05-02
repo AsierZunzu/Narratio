@@ -8,6 +8,7 @@
     "build": "tsc && cp -r src/server/templates dist/server/ && cp -r src/server/public dist/server/",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run--coverage",
     "lint": "npm run lint:ts && npm run lint:templates && npm run lint:docker && npm run lint:js",
     "lint:ts": "tsc --noEmit",
     "lint:templates": "find src/server/templates -name '*.ejs' | xargs -I{} ejslint {}",
