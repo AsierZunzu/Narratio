@@ -1,25 +1,13 @@
 services:
-  tts:
-    image: rhasspy/wyoming-piper
-    restart: unless-stopped
-    command: --voice ${PIPER_VOICE:-en_US-lessac-medium}
-    volumes:
-      - ./data/piper:/data
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.connect((\"localhost\",10200)); s.close()'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   narratio:
-    build: .
+    image: ghcr.io/asierzunzu/narratio:latest
+    # build: .
     restart: unless-stopped
     init: true
     environment:
       PORT: ${PORT:-3000}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
-      RSS_URL: ${RSS_URL}
+      RSS_URL: ${RSS_URL:-}
       POLL_INTERVAL: ${POLL_INTERVAL:-}
       PIPER_HOST: tts
       PIPER_PORT: "10200"
@@ -41,5 +29,24 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      tts:
+      tts-english:
         condition: service_healthy
+      tts-spanish:
+        condition: service_healthy
+
+  tts-english: &tts
+    image: rhasspy/wyoming-piper
+    restart: unless-stopped
+    command: --voice ${PIPER_VOICE_EN:-en_US-lessac-medium}
+    volumes:
+      - ./data/piper:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.connect((\"localhost\",10200)); s.close()'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  tts-spanish:
+    <<: *tts
+    command: --voice ${PIPER_VOICE_ES:-es_ES-sharvard-medium}
