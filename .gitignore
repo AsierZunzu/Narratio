@@ -9,4 +9,8 @@ data/
 /coverage*
 
 # Docker
+/.env
 /compose.override.yaml
+
+# AI
+/.claude/worktrees/
