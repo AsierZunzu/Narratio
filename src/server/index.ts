@@ -1,11 +1,15 @@
 import { fileURLToPath } from 'url';
+import { dirname } from 'node:path';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import net from 'net';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { getDb, closeDb } from '../db/index.js';
 import { buildFeedXml } from './feed.js';
-import { renderDashboard } from './ui.js';
+import { renderLibrary, renderFeeds, renderVoices } from './ui.js';
 import { getAllArticles, deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, requeueArticleForTts } from '../db/articles.js';
 import { getFeeds, getFeedById, getFeedBySlug, insertFeed, updateFeed, deleteFeedWithArticles, countFeedsByTtsService } from '../db/feeds.js';
 import { getTtsServices, getTtsServiceById, insertTtsService, updateTtsService, deleteTtsService } from '../db/tts-services.js';
@@ -17,6 +21,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
+const ASSETS_DIR = path.join(__dirname, 'public');
 
 async function ensureFeedFallbackAudio(
   db: ReturnType<typeof getDb>,
@@ -74,6 +79,7 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
   app.set('trust proxy', true);
   app.use(express.json());
   app.use(express.static(PUBLIC_DIR));
+  app.use('/assets', express.static(ASSETS_DIR, { maxAge: '1h', immutable: false }));
 
   app.get('/audio/:file', async (req, res) => {
     const filename = req.params['file'];
@@ -163,11 +169,41 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
       const articles = getAllArticles(db);
       const feedsList = getFeeds(db);
       const ttsServicesList = getTtsServices(db);
-      const html = renderDashboard(articles, baseUrl, feedsList, ttsServicesList);
+      const html = renderLibrary(articles, baseUrl, feedsList, ttsServicesList);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } catch (err) {
-      logger.error('Failed to render dashboard', err);
+      logger.error('Failed to render library', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  app.get('/feeds', (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    try {
+      const feedsList = getFeeds(db);
+      const ttsServicesList = getTtsServices(db);
+      const articleCount = getAllArticles(db).length;
+      const html = renderFeeds(baseUrl, feedsList, ttsServicesList, articleCount);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (err) {
+      logger.error('Failed to render feeds page', err);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  app.get('/voices', (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    try {
+      const feedsList = getFeeds(db);
+      const ttsServicesList = getTtsServices(db);
+      const articleCount = getAllArticles(db).length;
+      const html = renderVoices(baseUrl, ttsServicesList, feedsList.length, articleCount);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (err) {
+      logger.error('Failed to render voices page', err);
       res.status(500).send('Internal server error');
     }
   });

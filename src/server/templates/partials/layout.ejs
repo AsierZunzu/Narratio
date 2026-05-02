@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" href="/favicon.ico">
+  <title><%= pageTitle %> — Narratio</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <a href="#main-content" class="visually-hidden" style="position:absolute;left:-9999px">Skip to main content</a>
+  <div class="app">
+    <%- include('sidebar', { active: activeNav, counts: navCounts }) %>
+    <main class="main" id="main-content">
+      <%- body %>
+    </main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script>window.NARRATIO = { baseUrl: <%- JSON.stringify(baseUrl) %> };</script>
+  <script src="/assets/app.js" defer></script>
+  <% if (pageScript) { %><script src="/assets/<%= pageScript %>" defer></script><% } %>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<header class="masthead">
+  <div class="masthead-title-block">
+    <div class="masthead-eyebrow">Vol. I — The Library</div>
+    <h1 class="masthead-title">Today&rsquo;s <em>dispatches</em></h1>
+    <p class="masthead-subtitle">Articles ingested from your feeds, narrated and archived.</p>
+  </div>
+  <div class="masthead-actions">
+    <button class="btn btn-ghost" id="refresh-btn" type="button" aria-label="Refresh now" data-tip="Reload the dispatch list">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      <span>Refresh</span>
+    </button>
+  </div>
+</header>
+
+<section class="telemetry" aria-label="Status overview">
+  <% const order = [
+    { key: 'all', label: 'Total', cls: '' },
+    { key: 'pending', label: 'Pending', cls: 'pending' },
+    { key: 'converting', label: 'Converting', cls: 'converting' },
+    { key: 'done', label: 'Ready', cls: 'done' },
+    { key: 'failed', label: 'Failed', cls: 'failed' },
+    { key: 'purged', label: 'Purged', cls: 'purged' },
+  ]; %>
+  <% order.forEach(function(o) { %>
+    <button class="telemetry-cell is-filter <%= o.key === 'all' ? 'active' : '' %>" data-filter="<%= o.key %>" type="button" aria-pressed="<%= o.key === 'all' ? 'true' : 'false' %>">
+      <div class="telemetry-label">
+        <% if (o.cls) { %><span class="telemetry-dot <%= o.cls %>"></span><% } %>
+        <%= o.label %>
+      </div>
+      <div class="telemetry-value" data-count-of="<%= o.key %>"><%= counts[o.key] %></div>
+    </button>
+  <% }); %>
+</section>
+
+<div class="toolbar">
+  <label class="search-field">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" type="search" placeholder="Search dispatches by title, feed, or text…" aria-label="Search articles">
+  </label>
+  <div class="toolbar-spacer"></div>
+</div>
+
+<div class="dispatches" id="dispatches">
+  <% if (articles.length === 0) { %>
+    <div class="empty-state">
+      The press is silent.
+      <div class="empty-state-detail">No articles yet — your worker will populate this list after the next RSS poll.</div>
+    </div>
+  <% } else { %>
+    <% articles.forEach(function(a) { %>
+      <% var feed = a.feed_id ? feedMap[a.feed_id] : null; %>
+      <article class="dispatch" data-guid="<%= a.guid %>" data-status="<%= a.status %>" data-feed-id="<%= a.feed_id || '' %>" data-content="<%= a.content || '' %>" data-search="<%= (a.title + ' ' + (feed ? feed.name : '') + ' ' + (a.content || '')).toLowerCase() %>">
+        <div class="dispatch-body">
+          <div class="dispatch-meta">
+            <span class="badge badge-<%= a.status %>"><%= STATUS_LABELS[a.status] || a.status %></span>
+            <% if (feed) { %>
+              <span class="dispatch-meta-sep">·</span>
+              <a class="dispatch-feed" href="<%= baseUrl %>/rss/<%= feed.slug %>" target="_blank" rel="noopener" title="Open RSS for <%= feed.name %>"><%= feed.name %></a>
+            <% } %>
+            <span class="dispatch-meta-sep">·</span>
+            <span><%= formatDate(a.pub_date) %></span>
+          </div>
+          <h2 class="dispatch-title">
+            <% if (a.content) { %>
+              <button class="btn-view-content" type="button" data-guid="<%= a.guid %>" aria-label="Read full content"><%= a.title %></button>
+            <% } else { %>
+              <%= a.title %>
+            <% } %>
+          </h2>
+          <div class="dispatch-stats">
+            <span><span class="num"><%= wordCount(a.content) %></span> words</span>
+            <span><span class="num"><%= formatElapsed(a.tts_elapsed_ms) %></span> render</span>
+            <% if (a.status === 'failed') { %>
+              <span><span class="num"><%= a.tts_retries %>×</span> retries</span>
+            <% } %>
+          </div>
+          <% if (a.status === 'failed' && a.error) { %>
+            <div class="dispatch-error" title="<%= a.error %>"><%= a.error.length > 200 ? a.error.slice(0, 200) + '…' : a.error %></div>
+          <% } %>
+        </div>
+        <div class="dispatch-actions">
+          <% if (a.status === 'done' && a.audio_file) { %>
+            <a class="btn btn-success btn-sm" href="<%= baseUrl %>/audio/<%= encodeURIComponent(a.audio_file) %>" aria-label="Play audio" data-tip="Play the narrated audio">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v16l14-8z"/></svg>
+              <span>Play</span>
+            </a>
+          <% } %>
+          <% if (a.link) { %>
+            <a class="btn btn-sm" href="<%= a.link %>" target="_blank" rel="noopener" aria-label="Open original article" data-tip="Open the original article">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 14 20 4M19 13v6H5V5h6"/></svg>
+              <span>Source</span>
+            </a>
+          <% } %>
+          <% if (a.status === 'failed') { %>
+            <button class="btn btn-info btn-sm" data-action="retry" data-guid="<%= a.guid %>" type="button" data-tip="Re-queue this article for narration">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/></svg>
+              <span>Retry</span>
+            </button>
+          <% } %>
+          <% if (a.status === 'done' || a.status === 'purged') { %>
+            <button class="btn btn-success btn-sm" data-action="regenerate" data-guid="<%= a.guid %>" type="button" data-tip="Discard current audio and narrate again">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M5 14a8 8 0 0 0 14 3M19 10a8 8 0 0 0-14-3"/></svg>
+              <span>Regenerate</span>
+            </button>
+          <% } %>
+          <% if (a.status === 'done') { %>
+            <button class="btn btn-warn btn-sm" data-action="purge" data-guid="<%= a.guid %>" type="button" data-tip="Delete the audio file but keep the record">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>
+              <span>Purge</span>
+            </button>
+          <% } %>
+          <button class="btn btn-danger btn-sm" data-action="delete" data-guid="<%= a.guid %>" type="button" aria-label="Delete article" data-tip="Remove this dispatch entirely">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+          </button>
+        </div>
+      </article>
+    <% }); %>
+  <% } %>
+</div>
+
+<script>window.__FEED_MAP__ = <%- JSON.stringify(feedMap) %>;</script>
+
+<!-- Content reader -->
+<div class="modal" id="content-modal" role="dialog" aria-labelledby="content-title" aria-modal="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-panel wide">
+    <div class="modal-header">
+      <div>
+        <div class="modal-eyebrow">Full text</div>
+        <h2 class="modal-title" id="content-title"></h2>
+      </div>
+      <button class="modal-close" type="button" data-modal-close aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="content-body"><pre id="content-text"></pre></div>
+  </div>
+</div>

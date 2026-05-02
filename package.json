@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc && cp -r src/server/templates dist/server/",
+    "build": "tsc && cp -r src/server/templates dist/server/ && cp -r src/server/public dist/server/",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npm run lint:ts && npm run lint:templates && npm run lint:docker && npm run lint:js",
@@ -26,17 +26,18 @@
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.10",
     "@types/ejs": "^3.1.5",
     "@types/express": "^5.0.6",
     "@types/html-to-text": "^9.0.4",
     "@types/node": "^25.6.0",
     "@types/node-cron": "^3.0.11",
-    "@eslint/js": "^10.0.1",
     "@types/supertest": "^7.2.0",
     "@vitest/coverage-v8": "^4.1.5",
     "ejs-lint": "^2.0.1",
     "eslint": "^10.2.1",
+    "globals": "^17.6.0",
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.1",

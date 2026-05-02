@@ -1,0 +1,181 @@
+<header class="masthead">
+  <div class="masthead-title-block">
+    <div class="masthead-eyebrow">Vol. II — Feeds</div>
+    <h1 class="masthead-title">Your <em>subscriptions</em></h1>
+    <p class="masthead-subtitle">RSS sources, each rendered to its own podcast channel.</p>
+  </div>
+  <div class="masthead-actions">
+    <button class="btn btn-primary" id="add-feed-btn" type="button" data-tip="Subscribe to a new RSS source">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span>New Feed</span>
+    </button>
+  </div>
+</header>
+
+<div class="resource-grid" id="feeds-grid">
+  <% if (feeds.length === 0) { %>
+    <div class="empty-state" style="grid-column:1/-1">
+      No feeds configured.
+      <div class="empty-state-detail">Add your first RSS source to start narrating.</div>
+    </div>
+  <% } else { %>
+    <% feeds.forEach(function(f) { %>
+      <% var tts = ttsServices.find(function(s) { return s.id === f.tts_service_id; }); %>
+      <article class="card" data-feed-id="<%= f.id %>">
+        <header class="card-header">
+          <div style="min-width:0">
+            <div class="card-title"><%= f.name %></div>
+            <div class="card-subtitle"><%= f.title %></div>
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-sm" data-feed-edit="<%= f.id %>" type="button" data-tip="Edit feed configuration" data-tip-pos="below">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M14 6l4 4"/></svg>
+              <span>Edit</span>
+            </button>
+            <button class="btn btn-danger btn-sm" data-feed-delete="<%= f.id %>" type="button" aria-label="Delete feed" data-tip="Remove this feed and its articles" data-tip-pos="below">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+            </button>
+          </div>
+        </header>
+        <div class="card-rows">
+          <div class="card-row">
+            <div class="card-row-label">Podcast</div>
+            <div class="card-row-value"><a href="<%= baseUrl %>/rss/<%= f.slug %>" target="_blank" rel="noopener"><%= baseUrl %>/rss/<%= f.slug %></a></div>
+          </div>
+          <div class="card-row">
+            <div class="card-row-label">Source</div>
+            <div class="card-row-value mono"><%= f.rss_url %></div>
+          </div>
+          <div class="card-row">
+            <div class="card-row-label">Voice</div>
+            <div class="card-row-value"><%= tts ? tts.name + ' (' + tts.host + ':' + tts.port + ')' : 'Unknown' %></div>
+          </div>
+          <div class="card-row">
+            <div class="card-row-label">Quotas</div>
+            <div class="card-row-value mono"><%= f.max_audio_files ? f.max_audio_files + ' files' : '∞ files' %> · <%= f.max_audio_size_mb ? f.max_audio_size_mb + ' MB' : '∞ MB' %></div>
+          </div>
+        </div>
+      </article>
+    <% }); %>
+  <% } %>
+</div>
+
+<!-- Feed modal -->
+<div class="modal" id="feed-modal" role="dialog" aria-labelledby="feed-modal-title" aria-modal="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-panel wide">
+    <div class="modal-header">
+      <div>
+        <div class="modal-eyebrow" id="feed-modal-eyebrow">New subscription</div>
+        <h2 class="modal-title" id="feed-modal-title">Add Feed</h2>
+      </div>
+      <button class="modal-close" type="button" data-modal-close aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
+    </div>
+    <form id="feed-form" autocomplete="off" novalidate>
+      <div class="modal-body">
+        <input type="hidden" id="feed-id" value="">
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-name">Name<span class="req">*</span></label>
+            <input id="f-name" name="name" required placeholder="My Tech Podcast">
+          </div>
+          <div class="field">
+            <label for="f-tts">Voice<span class="req">*</span></label>
+            <select id="f-tts" name="tts_service_id" required>
+              <% ttsServices.forEach(function(svc) { %>
+                <option value="<%= svc.id %>"><%= svc.name %> (<%= svc.host %>:<%= svc.port %>)</option>
+              <% }); %>
+              <% if (ttsServices.length === 0) { %>
+                <option value="" disabled>No voices configured</option>
+              <% } %>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="f-rss-url">RSS URL<span class="req">*</span></label>
+            <input id="f-rss-url" name="rss_url" type="url" required placeholder="https://example.com/feed.xml">
+          </div>
+          <div class="field">
+            <label for="f-slug">Slug<span class="req">*</span></label>
+            <input id="f-slug" name="slug" required pattern="[a-z0-9-]+" placeholder="my-tech-podcast">
+            <span class="hint">Podcast URL: <span id="f-slug-preview"></span></span>
+          </div>
+          <div class="field">
+            <label for="f-title">Podcast Title<span class="req">*</span></label>
+            <input id="f-title" name="title" required placeholder="My Tech Podcast">
+          </div>
+          <div class="field full">
+            <label for="f-desc">Description</label>
+            <textarea id="f-desc" name="description" placeholder="A brief description of this podcast"></textarea>
+          </div>
+          <div class="field">
+            <label for="f-author">Author</label>
+            <input id="f-author" name="author" placeholder="Narratio Worker">
+          </div>
+          <div class="field">
+            <label for="f-lang">Language</label>
+            <input id="f-lang" name="language" placeholder="en">
+          </div>
+          <div class="field">
+            <label for="f-max-files">Max audio files</label>
+            <input id="f-max-files" name="max_audio_files" type="number" min="1" placeholder="Unlimited">
+            <span class="hint">Leave empty for no limit</span>
+          </div>
+          <div class="field">
+            <label for="f-max-size">Max audio size (MB)</label>
+            <input id="f-max-size" name="max_audio_size_mb" type="number" min="1" placeholder="Unlimited">
+            <span class="hint">Leave empty for no limit</span>
+          </div>
+        </div>
+
+        <details class="advanced">
+          <summary>iTunes metadata &amp; fallback messages</summary>
+          <div class="form-grid">
+            <div class="field">
+              <label for="f-itunes-author">iTunes Author</label>
+              <input id="f-itunes-author" name="itunes_author">
+            </div>
+            <div class="field">
+              <label for="f-itunes-category">iTunes Category</label>
+              <input id="f-itunes-category" name="itunes_category" placeholder="Technology">
+            </div>
+            <div class="field">
+              <label for="f-itunes-owner-name">Owner name</label>
+              <input id="f-itunes-owner-name" name="itunes_owner_name">
+            </div>
+            <div class="field">
+              <label for="f-itunes-owner-email">Owner email</label>
+              <input id="f-itunes-owner-email" name="itunes_owner_email" type="email">
+            </div>
+            <div class="field full">
+              <label for="f-itunes-summary">iTunes Summary</label>
+              <textarea id="f-itunes-summary" name="itunes_summary"></textarea>
+            </div>
+            <div class="field full">
+              <label for="f-unavailable-msg">Unavailable episode message</label>
+              <textarea id="f-unavailable-msg" name="unavailable_message" placeholder="This content is no longer available on the server."></textarea>
+            </div>
+            <div class="field full">
+              <label for="f-failed-msg">TTS failed message</label>
+              <textarea id="f-failed-msg" name="tts_failed_message" placeholder="This podcast episode could not be generated due to a text-to-speech error."></textarea>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="modal-footer">
+        <span></span>
+        <div style="display:flex;gap:10px">
+          <button type="button" class="btn btn-ghost" data-modal-close data-tip="Discard changes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+            <span>Cancel</span>
+          </button>
+          <button type="submit" class="btn btn-primary" id="feed-form-submit" data-tip="Save this feed">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <span>Save Feed</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
