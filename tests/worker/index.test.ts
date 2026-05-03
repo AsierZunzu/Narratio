@@ -74,7 +74,9 @@ vi.mock('../../src/db/index.js', () => ({
 
 vi.mock('../../src/db/worker-state.js', () => ({
   setWorkerStatus: vi.fn(),
-  getWorkerState: vi.fn(() => ({ id: 1, status: 'idle', updated_at: '2026-04-27T00:00:00Z' })),
+  getWorkerState: vi.fn(() => ({ id: 1, status: 'idle', updated_at: '2026-04-27T00:00:00Z', trigger_requested_at: null })),
+  consumeWorkerTrigger: vi.fn(() => false),
+  requestWorkerRun: vi.fn(() => 'queued'),
 }));
 
 vi.mock('../../src/db/articles.js', () => ({

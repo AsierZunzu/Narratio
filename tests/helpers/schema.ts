@@ -28,9 +28,10 @@ CREATE TABLE IF NOT EXISTS feeds (
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS worker_state (
-  id          INTEGER PRIMARY KEY,
-  status      TEXT NOT NULL DEFAULT 'idle',
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id                    INTEGER PRIMARY KEY,
+  status                TEXT NOT NULL DEFAULT 'idle',
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  trigger_requested_at  TEXT
 );
 INSERT OR IGNORE INTO worker_state (id, status) VALUES (1, 'idle');
 CREATE TABLE IF NOT EXISTS articles (
