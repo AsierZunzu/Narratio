@@ -8,6 +8,7 @@ data/
 #Tests
 /coverage*
 /.vitest-reports/
+/screenshots/
 
 # Docker
 /.env
