@@ -38,7 +38,7 @@ export const articles = sqliteTable('articles', {
   feed_id:        integer('feed_id'),
   title:          text('title').notNull(),
   link:           text('link'),
-  pub_date:       text('pub_date'),
+  pub_date:       integer('pub_date', { mode: 'timestamp_ms' }),
   content:        text('content'),
   image_url:      text('image_url'),
   audio_file:     text('audio_file'),

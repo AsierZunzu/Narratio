@@ -152,10 +152,9 @@ describe('processFeed', () => {
 
     const older = getArticleByGuid(db, 'date-old');
     const newer = getArticleByGuid(db, 'date-new');
-    expect(older?.pub_date).toBe('2026-05-01T09:00:00.000Z');
-    expect(newer?.pub_date).toBe('2026-05-04T09:00:00.000Z');
-    // Lexicographic comparison must agree with chronology.
-    expect(newer!.pub_date! > older!.pub_date!).toBe(true);
+    expect(older?.pub_date?.toISOString()).toBe('2026-05-01T09:00:00.000Z');
+    expect(newer?.pub_date?.toISOString()).toBe('2026-05-04T09:00:00.000Z');
+    expect(newer!.pub_date!.getTime() > older!.pub_date!.getTime()).toBe(true);
   });
 
   it('prefers isoDate when both date fields present', async () => {
@@ -167,21 +166,44 @@ describe('processFeed', () => {
     await processFeed(db, baseOpts());
 
     const a = getArticleByGuid(db, 'date-iso');
-    expect(a?.pub_date).toBe('2026-05-02T12:00:00.000Z');
+    expect(a?.pub_date?.toISOString()).toBe('2026-05-02T12:00:00.000Z');
   });
 
   describe('normalisePubDate', () => {
-    it('converts RFC 2822 to ISO 8601 UTC', () => {
-      expect(normalisePubDate('Mon, 02 May 2026 09:00:00 GMT')).toBe('2026-05-02T09:00:00.000Z');
+    it('converts RFC 2822 to a Date', () => {
+      expect(normalisePubDate('Mon, 02 May 2026 09:00:00 GMT')?.toISOString()).toBe('2026-05-02T09:00:00.000Z');
     });
-    it('passes ISO 8601 through unchanged in value', () => {
-      expect(normalisePubDate('2026-05-02T09:00:00.000Z')).toBe('2026-05-02T09:00:00.000Z');
+    it('parses ISO 8601 to a Date', () => {
+      expect(normalisePubDate('2026-05-02T09:00:00.000Z')?.toISOString()).toBe('2026-05-02T09:00:00.000Z');
     });
     it('returns null for missing or unparseable input', () => {
       expect(normalisePubDate(null)).toBeNull();
       expect(normalisePubDate(undefined)).toBeNull();
       expect(normalisePubDate('')).toBeNull();
       expect(normalisePubDate('not a date')).toBeNull();
+    });
+
+    it('parses Spanish RFC 2822-style dates (e.g. AEMET feed)', () => {
+      expect(normalisePubDate('jue, 15 ene 2026 00:00 +0000')?.toISOString())
+        .toBe('2026-01-15T00:00:00.000Z');
+      // Ambiguous "mar" resolves by position: weekday → Tue, month → Mar
+      expect(normalisePubDate('mar, 03 mar 2026 12:30:00 +0000')?.toISOString())
+        .toBe('2026-03-03T12:30:00.000Z');
+      // Diacritic stripping: mié → Wed
+      expect(normalisePubDate('mié, 01 abr 2026 09:00:00 +0000')?.toISOString())
+        .toBe('2026-04-01T09:00:00.000Z');
+    });
+
+    it('parses French and German localised dates', () => {
+      expect(normalisePubDate('lun, 02 févr 2026 08:00:00 +0000')?.toISOString())
+        .toBe('2026-02-02T08:00:00.000Z');
+      expect(normalisePubDate('Mi, 18 Mrz 2026 14:00:00 +0000')?.toISOString())
+        .toBe('2026-03-18T14:00:00.000Z');
+    });
+
+    it('handles localised dates without a weekday prefix', () => {
+      expect(normalisePubDate('15 ene 2026 00:00:00 +0000')?.toISOString())
+        .toBe('2026-01-15T00:00:00.000Z');
     });
   });
 

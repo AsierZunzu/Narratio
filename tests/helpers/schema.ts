@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS articles (
   feed_id         INTEGER,
   title           TEXT NOT NULL,
   link            TEXT,
-  pub_date        TEXT,
+  pub_date        INTEGER,
   content         TEXT,
   image_url       TEXT,
   audio_file      TEXT,
