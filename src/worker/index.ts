@@ -4,7 +4,7 @@ import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
 import type { Feed, TtsService } from '../db/index.js';
 import { resetFailedRetries, resetConvertingArticles, resetAllArticlesForRegen } from '../db/articles.js';
-import { setWorkerStatus } from '../db/worker-state.js';
+import { setWorkerStatus, consumeWorkerTrigger } from '../db/worker-state.js';
 import { getFeeds } from '../db/feeds.js';
 import { getTtsServiceById } from '../db/tts-services.js';
 import { processFeed, processPendingArticles } from '../services/rss.js';
@@ -13,6 +13,7 @@ import { env } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
+const TRIGGER_POLL_MS = 5000;
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 
@@ -61,6 +62,7 @@ async function runOnce(isFirst = false): Promise<void> {
     const stuck = resetConvertingArticles(db);
     if (stuck > 0) logger.warn(`Reset ${stuck} stuck 'converting' articles to pending`);
   }
+  consumeWorkerTrigger(db);
   setWorkerStatus(db, 'running');
   try {
     const feeds = getFeeds(db);
@@ -162,12 +164,14 @@ async function main(): Promise<void> {
 
   let shuttingDown = false;
   const cronTasks: cron.ScheduledTask[] = [];
+  const intervalTimers: NodeJS.Timeout[] = [];
 
   const shutdown = () => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info('Worker shutting down…');
     for (const task of cronTasks) task.stop();
+    for (const timer of intervalTimers) clearInterval(timer);
     closeDb();
     process.exit(0);
   };
@@ -207,6 +211,17 @@ async function main(): Promise<void> {
     await runPendingCheck();
   }));
   logger.info('Scheduling pending check: every minute');
+
+  // Poll for on-demand run requests (set via POST /api/worker/run)
+  intervalTimers.push(setInterval(async () => {
+    if (shuttingDown || isRunning) return;
+    const db = getDb(DB_PATH);
+    if (consumeWorkerTrigger(db)) {
+      logger.info('On-demand worker run triggered');
+      await runOnce();
+    }
+  }, TRIGGER_POLL_MS));
+  logger.info(`Scheduling on-demand trigger check: every ${TRIGGER_POLL_MS / 1000}s`);
 }
 
 main().catch((err) => {

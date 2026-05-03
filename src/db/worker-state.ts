@@ -23,3 +23,26 @@ export function setWorkerStatus(db: Db, status: WorkerStatus): void {
     .where(eq(workerState.id, SINGLETON_ID))
     .run();
 }
+
+export type TriggerOutcome = 'queued' | 'already-pending' | 'already-running';
+
+export function requestWorkerRun(db: Db): TriggerOutcome {
+  const state = getWorkerState(db);
+  if (state.status === 'running') return 'already-running';
+  if (state.trigger_requested_at) return 'already-pending';
+  db.update(workerState)
+    .set({ trigger_requested_at: sql`(datetime('now'))` })
+    .where(eq(workerState.id, SINGLETON_ID))
+    .run();
+  return 'queued';
+}
+
+export function consumeWorkerTrigger(db: Db): boolean {
+  const state = getWorkerState(db);
+  if (!state.trigger_requested_at) return false;
+  db.update(workerState)
+    .set({ trigger_requested_at: null })
+    .where(eq(workerState.id, SINGLETON_ID))
+    .run();
+  return true;
+}

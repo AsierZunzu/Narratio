@@ -79,8 +79,9 @@
   // Worker status pill — polls /api/worker/status, ticks countdown locally.
   const workerEl = document.getElementById('worker-status');
   const workerDetailEl = document.getElementById('worker-status-detail');
+  const workerRunBtn = document.getElementById('worker-run-btn');
   if (workerEl && workerDetailEl) {
-    let workerState = { status: 'idle', nextRunAt: null, pollInterval: null, since: null };
+    let workerState = { status: 'idle', nextRunAt: null, pollInterval: null, since: null, triggerRequestedAt: null };
 
     function relativeFromNow(iso) {
       const target = new Date(iso).getTime();
@@ -94,18 +95,23 @@
     }
 
     function renderWorker() {
-      if (workerState.status === 'running') {
+      const running = workerState.status === 'running';
+      const queued = !running && !!workerState.triggerRequestedAt;
+      if (running) {
         workerEl.classList.add('worker-status-running');
         workerEl.classList.remove('worker-status-idle');
         workerDetailEl.textContent = 'running…';
-        return;
-      }
-      workerEl.classList.add('worker-status-idle');
-      workerEl.classList.remove('worker-status-running');
-      if (workerState.nextRunAt) {
-        workerDetailEl.textContent = 'next in ' + relativeFromNow(workerState.nextRunAt);
       } else {
-        workerDetailEl.textContent = 'one-shot';
+        workerEl.classList.add('worker-status-idle');
+        workerEl.classList.remove('worker-status-running');
+        if (queued) workerDetailEl.textContent = 'queued…';
+        else if (workerState.nextRunAt) workerDetailEl.textContent = 'next in ' + relativeFromNow(workerState.nextRunAt);
+        else workerDetailEl.textContent = 'one-shot';
+      }
+      if (workerRunBtn) {
+        const disabled = running || queued;
+        workerRunBtn.disabled = disabled;
+        workerRunBtn.textContent = queued ? 'Queued' : (running ? 'Running' : 'Run now');
       }
     }
 
@@ -116,6 +122,30 @@
         workerState = await res.json();
       } catch { /* silent */ }
       renderWorker();
+    }
+
+    if (workerRunBtn) {
+      workerRunBtn.addEventListener('click', async () => {
+        if (workerRunBtn.disabled) return;
+        workerRunBtn.disabled = true;
+        try {
+          const res = await fetch('/api/worker/run', { method: 'POST' });
+          let body = null;
+          try { body = await res.json(); } catch { /* ignore */ }
+          if (res.status === 202) {
+            window.Narratio.showToast('Worker run queued');
+          } else if (res.status === 200) {
+            window.Narratio.showToast(body && body.message ? body.message : 'A run is already queued');
+          } else if (res.status === 409) {
+            window.Narratio.showToast(body && body.message ? body.message : 'Worker is already running', true);
+          } else {
+            window.Narratio.showToast('Failed to queue worker run', true);
+          }
+        } catch {
+          window.Narratio.showToast('Failed to queue worker run', true);
+        }
+        fetchWorker();
+      });
     }
 
     fetchWorker();

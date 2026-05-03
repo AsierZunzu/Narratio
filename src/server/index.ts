@@ -9,7 +9,7 @@ import { CronExpressionParser } from 'cron-parser';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { getDb, closeDb } from '../db/index.js';
-import { getWorkerState } from '../db/worker-state.js';
+import { getWorkerState, requestWorkerRun } from '../db/worker-state.js';
 import { buildFeedXml } from './feed.js';
 import { renderLibrary, renderFeeds, renderVoices } from './ui.js';
 import { deleteArticle, resetArticleRetries, markArticlePurged, getArticleByGuid, requeueArticleForTts, getArticlesPage, getArticleStatusCounts, type ArticleStatusCounts } from '../db/articles.js';
@@ -236,8 +236,9 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
     try {
       const state = getWorkerState(db);
       const pollInterval = env.POLL_INTERVAL() ?? null;
+      const triggerRequestedAt = state.trigger_requested_at ?? null;
       if (state.status === 'running') {
-        res.json({ status: 'running', since: state.updated_at, pollInterval });
+        res.json({ status: 'running', since: state.updated_at, pollInterval, triggerRequestedAt });
         return;
       }
       let nextRunAt: string | null = null;
@@ -250,10 +251,28 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
           nextRunAt = null;
         }
       }
-      res.json({ status: 'idle', nextRunAt, pollInterval });
+      res.json({ status: 'idle', nextRunAt, pollInterval, triggerRequestedAt });
     } catch (err) {
       logger.error('Failed to read worker status', err);
-      res.json({ status: 'idle', nextRunAt: null, pollInterval: null });
+      res.json({ status: 'idle', nextRunAt: null, pollInterval: null, triggerRequestedAt: null });
+    }
+  });
+
+  app.post('/api/worker/run', (_req, res) => {
+    try {
+      const outcome = requestWorkerRun(db);
+      if (outcome === 'already-running') {
+        res.status(409).json({ ok: false, outcome, message: 'Worker is already running' });
+        return;
+      }
+      if (outcome === 'already-pending') {
+        res.status(200).json({ ok: true, outcome, message: 'A run is already queued' });
+        return;
+      }
+      res.status(202).json({ ok: true, outcome, message: 'Worker run queued' });
+    } catch (err) {
+      logger.error('Failed to queue worker run', err);
+      res.status(500).json({ ok: false, message: 'Internal server error' });
     }
   });
 

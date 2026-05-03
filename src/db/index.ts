@@ -44,9 +44,10 @@ CREATE TABLE IF NOT EXISTS feeds (
 
 const WORKER_STATE_SQL = `
 CREATE TABLE IF NOT EXISTS worker_state (
-  id          INTEGER PRIMARY KEY,
-  status      TEXT NOT NULL DEFAULT 'idle',
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id                    INTEGER PRIMARY KEY,
+  status                TEXT NOT NULL DEFAULT 'idle',
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  trigger_requested_at  TEXT
 );
 `;
 
@@ -117,6 +118,7 @@ export function getDb(dbPath?: string): Db {
 
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }
+  try { _sqlite.exec('ALTER TABLE worker_state ADD COLUMN trigger_requested_at TEXT'); } catch { /* already exists */ }
 
   normaliseLegacyPubDates(_sqlite);
   seedDefaultTtsService(_sqlite);

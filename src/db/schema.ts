@@ -50,9 +50,10 @@ export const articles = sqliteTable('articles', {
 });
 
 export const workerState = sqliteTable('worker_state', {
-  id:         integer('id').primaryKey(),
-  status:     text('status', { enum: ['idle', 'running'] }).notNull().default('idle'),
-  updated_at: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  id:                   integer('id').primaryKey(),
+  status:               text('status', { enum: ['idle', 'running'] }).notNull().default('idle'),
+  updated_at:           text('updated_at').notNull().default(sql`(datetime('now'))`),
+  trigger_requested_at: text('trigger_requested_at'),
 });
 
 export type TtsService = InferSelectModel<typeof ttsServices>;
