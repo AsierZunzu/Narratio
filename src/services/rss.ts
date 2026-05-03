@@ -42,11 +42,64 @@ const parser = new Parser<CustomFeed, CustomItem>({
   },
 });
 
+const DAY_TRANSLATIONS: Record<string, string> = {
+  // Spanish
+  lun: 'Mon', mar: 'Tue', mie: 'Wed', jue: 'Thu', vie: 'Fri', sab: 'Sat', dom: 'Sun',
+  lunes: 'Mon', martes: 'Tue', miercoles: 'Wed', jueves: 'Thu', viernes: 'Fri', sabado: 'Sat', domingo: 'Sun',
+  // French
+  mer: 'Wed', jeu: 'Thu', ven: 'Fri', sam: 'Sat', dim: 'Sun',
+  // German
+  mo: 'Mon', di: 'Tue', mi: 'Wed', do: 'Thu', fr: 'Fri', sa: 'Sat', so: 'Sun',
+  mon: 'Mon', die: 'Tue', mit: 'Wed', don: 'Thu', fre: 'Fri', son: 'Sun',
+  // Italian
+  gio: 'Thu',
+  // Portuguese
+  seg: 'Mon', ter: 'Tue', qua: 'Wed', qui: 'Thu', sex: 'Fri',
+};
+
+const MONTH_TRANSLATIONS: Record<string, string> = {
+  // Spanish
+  ene: 'Jan', feb: 'Feb', mar: 'Mar', abr: 'Apr', may: 'May', jun: 'Jun', jul: 'Jul',
+  ago: 'Aug', sep: 'Sep', sept: 'Sep', oct: 'Oct', nov: 'Nov', dic: 'Dec',
+  // French
+  janv: 'Jan', jan: 'Jan', fevr: 'Feb', fev: 'Feb', mars: 'Mar', avr: 'Apr',
+  juin: 'Jun', juil: 'Jul', aout: 'Aug', dec: 'Dec',
+  // German
+  mrz: 'Mar', mai: 'May', okt: 'Oct', dez: 'Dec',
+  // Italian
+  gen: 'Jan', mag: 'May', giu: 'Jun', lug: 'Jul', set: 'Sep', ott: 'Oct',
+  // Portuguese
+  out: 'Oct',
+};
+
+function stripDiacritics(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Re-emit the input as an English RFC 2822-shaped string by replacing the
+ * weekday and month tokens via DAY_TRANSLATIONS / MONTH_TRANSLATIONS.
+ * Position resolves ambiguity (e.g. Spanish "mar" can be Tuesday or March).
+ */
+function translateLocalisedDate(input: string): string | null {
+  const ascii = stripDiacritics(input);
+  const m = ascii.match(/^\s*(?:([A-Za-z]+),\s*)?(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})(.*)$/);
+  if (!m) return null;
+  const [, dow, day, month, year, rest] = m;
+  const monthEn = MONTH_TRANSLATIONS[month.toLowerCase()];
+  if (!monthEn) return null;
+  const dowEn = dow ? (DAY_TRANSLATIONS[dow.toLowerCase()] ?? dow) : null;
+  return `${dowEn ? `${dowEn}, ` : ''}${day} ${monthEn} ${year}${rest}`;
+}
+
 export function normalisePubDate(input: string | undefined | null): Date | null {
   if (!input) return null;
-  const t = Date.parse(input);
-  if (Number.isNaN(t)) return null;
-  return new Date(t);
+  let t = Date.parse(input);
+  if (Number.isNaN(t)) {
+    const translated = translateLocalisedDate(input);
+    if (translated) t = Date.parse(translated);
+  }
+  return Number.isNaN(t) ? null : new Date(t);
 }
 
 function extractImageUrl(item: FeedItem): string | null {

@@ -182,6 +182,29 @@ describe('processFeed', () => {
       expect(normalisePubDate('')).toBeNull();
       expect(normalisePubDate('not a date')).toBeNull();
     });
+
+    it('parses Spanish RFC 2822-style dates (e.g. AEMET feed)', () => {
+      expect(normalisePubDate('jue, 15 ene 2026 00:00 +0000')?.toISOString())
+        .toBe('2026-01-15T00:00:00.000Z');
+      // Ambiguous "mar" resolves by position: weekday → Tue, month → Mar
+      expect(normalisePubDate('mar, 03 mar 2026 12:30:00 +0000')?.toISOString())
+        .toBe('2026-03-03T12:30:00.000Z');
+      // Diacritic stripping: mié → Wed
+      expect(normalisePubDate('mié, 01 abr 2026 09:00:00 +0000')?.toISOString())
+        .toBe('2026-04-01T09:00:00.000Z');
+    });
+
+    it('parses French and German localised dates', () => {
+      expect(normalisePubDate('lun, 02 févr 2026 08:00:00 +0000')?.toISOString())
+        .toBe('2026-02-02T08:00:00.000Z');
+      expect(normalisePubDate('Mi, 18 Mrz 2026 14:00:00 +0000')?.toISOString())
+        .toBe('2026-03-18T14:00:00.000Z');
+    });
+
+    it('handles localised dates without a weekday prefix', () => {
+      expect(normalisePubDate('15 ene 2026 00:00:00 +0000')?.toISOString())
+        .toBe('2026-01-15T00:00:00.000Z');
+    });
   });
 
   it('permanently fails article after exhausting retries', async () => {
