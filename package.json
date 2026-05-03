@@ -13,7 +13,8 @@
     "lint:ts": "tsc --noEmit",
     "lint:templates": "find src/server/templates -name '*.ejs' | xargs -I{} ejslint {}",
     "lint:docker": "docker run --rm -v \"$(pwd):/work\" -w /work hadolint/hadolint hadolint Dockerfile",
-    "lint:js": "eslint ."
+    "lint:js": "eslint .",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "@extractus/article-extractor": "^8.0.20",
@@ -40,6 +41,7 @@
     "ejs-lint": "^2.0.1",
     "eslint": "^10.2.1",
     "globals": "^17.6.0",
+    "playwright": "^1.59.1",
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.1",
