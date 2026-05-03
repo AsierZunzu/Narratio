@@ -277,7 +277,7 @@ body::before {
 /* Main */
 .main {
   min-width: 0;
-  padding: 32px 40px 80px;
+  padding: 32px clamp(16px, 4vw, 40px) 80px;
   max-width: 1480px;
   width: 100%;
 }
@@ -313,7 +313,7 @@ body::before {
 .masthead-title {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 38px;
+  font-size: clamp(26px, 4.2vw, 38px);
   letter-spacing: -0.02em;
   line-height: 1.05;
   color: var(--paper-0);
@@ -328,12 +328,12 @@ body::before {
   margin-top: 10px;
   font-family: var(--serif);
   font-style: italic;
-  font-size: 16.5px;
+  font-size: clamp(14px, 1.6vw, 16.5px);
   line-height: 1.5;
   color: var(--paper-2);
   font-variation-settings: 'opsz' 14;
 }
-.masthead-actions { display: flex; gap: 10px; flex-shrink: 0; align-items: center; }
+.masthead-actions { display: flex; gap: 10px; flex-shrink: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 
 /* =========================================================================
    Status strip — telemetry
@@ -341,7 +341,7 @@ body::before {
 
 .telemetry {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0;
   border: 1px solid var(--rule);
   border-radius: 0;
@@ -353,12 +353,13 @@ body::before {
   position: relative;
   background: transparent;
   border: 0;
-  border-left: 1px solid var(--rule);
+  /* Use box-shadow for cell separator so wrapped rows still divide cleanly */
+  box-shadow: inset 1px 0 0 var(--rule);
   color: inherit;
   font: inherit;
   text-align: left;
 }
-.telemetry-cell:first-child { border-left: 0; }
+.telemetry-cell:first-child { box-shadow: none; }
 .telemetry-label {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -383,7 +384,7 @@ body::before {
 .telemetry-value {
   font-family: var(--serif);
   font-weight: 500;
-  font-size: 32px;
+  font-size: clamp(24px, 3.4vw, 32px);
   line-height: 1;
   color: var(--paper-0);
   font-variation-settings: 'opsz' 72;
@@ -420,8 +421,8 @@ body::before {
 }
 .search-field {
   position: relative;
-  flex: 1;
-  min-width: 240px;
+  flex: 1 1 240px;
+  min-width: 0;
   max-width: 460px;
 }
 .search-field input {
@@ -766,7 +767,7 @@ body::before {
 
 .resource-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
   gap: 18px;
 }
 
@@ -926,7 +927,9 @@ body::before {
   justify-content: space-between;
   align-items: center;
   background: var(--ink-1);
+  flex-wrap: wrap;
 }
+.modal-footer > * { min-width: 0; }
 
 /* Forms */
 .form-grid {
@@ -1059,28 +1062,156 @@ details.advanced .form-grid { padding: 16px; }
    Responsive
    ========================================================================= */
 
-@media (max-width: 920px) {
+/* Tablet & below — collapse the sidebar into a top bar */
+@media (max-width: 1024px) {
   .app { grid-template-columns: 1fr; }
   .sidebar {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 50;
     height: auto;
     border-right: none;
     border-bottom: 1px solid var(--rule);
-    padding: 16px 0;
+    padding: 14px 0 12px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto;
+    align-items: center;
+    column-gap: 16px;
+    overflow: visible;
+    background: var(--ink-1);
   }
-  .brand { padding: 0 20px 16px; margin-bottom: 12px; }
-  .nav-section { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px; margin-bottom: 0; }
+  .brand {
+    padding: 0 20px;
+    margin: 0;
+    border-bottom: none;
+    grid-column: 1;
+  }
+  .brand-mark { font-size: 22px; }
+  .brand-tag { display: none; }
+  .nav-section {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 0;
+    margin: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-section::-webkit-scrollbar { display: none; }
   .nav-section-title { display: none; }
-  .nav-link { width: auto; padding: 6px 12px; font-size: 13px; }
+  .nav-link {
+    width: auto;
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 999px;
+  }
   .nav-link.active::before { display: none; }
-  .sidebar-footer { display: none; }
-  .main { padding: 24px 20px 60px; }
-  .masthead-title { font-size: 30px; }
+  .sidebar-footer {
+    grid-column: 3;
+    margin: 0;
+    padding: 0 20px 0 0;
+    border-top: none;
+  }
+  .sidebar-footer .heartbeat { display: none; }
+  .worker-status-label { display: none; }
+  .main { padding: 24px clamp(14px, 4vw, 24px) 60px; }
   .modal-panel { max-width: 100%; }
 }
 
-@media (max-width: 600px) {
-  .dispatch { grid-template-columns: 1fr; gap: 12px; }
-  .dispatch-actions { justify-content: flex-start; flex-wrap: wrap; }
+/* Hide worker detail when really cramped to keep top bar tidy */
+@media (max-width: 720px) {
+  .sidebar-footer { display: none; }
+  .sidebar { grid-template-columns: auto 1fr; column-gap: 12px; }
+  .masthead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .masthead-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
   .form-grid { grid-template-columns: 1fr; }
+  .modal-header { padding: 18px 20px 14px; }
+  .modal-body { padding: 18px 20px; }
+  .modal-footer { padding: 14px 20px; }
+  .modal-footer > div { width: 100%; justify-content: flex-end; }
+}
+
+/* Tablet & narrow desktop — telemetry to even 3×2, stack dispatch actions */
+@media (max-width: 960px) {
+  .telemetry { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .telemetry-cell:nth-child(3n + 1) { box-shadow: none; }
+
+  .dispatch {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 20px 2px;
+  }
+  .dispatch-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Phone */
+@media (max-width: 600px) {
+  body { font-size: 14.5px; }
+  .brand { padding: 0 14px; }
+  .main { padding-top: 18px; }
+  .telemetry { grid-template-columns: repeat(3, 1fr); }
+  .telemetry-cell { padding: 12px 12px; }
+  .telemetry-label { font-size: 10.5px; margin-bottom: 6px; }
+  /* Restart left-edge separator at the start of each wrapped row */
+  .telemetry-cell:nth-child(3n + 1) { box-shadow: none; }
+
+  .dispatch {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 18px 2px;
+  }
+  .dispatch-title { font-size: 18px; }
+  .dispatch-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /* Hide button labels on phones so the action row stays one line of icon chips */
+  .dispatch-actions .btn span:not(.num) { display: none; }
+  .dispatch-actions .btn-sm {
+    padding: 0;
+    width: 34px;
+    height: 34px;
+    justify-content: center;
+  }
+
+  .card { padding: 18px; }
+  .card-title { font-size: 19px; }
+  .card-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-bottom: 10px;
+  }
+
+  #toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    text-align: center;
+  }
+}
+
+/* Very small / older phones */
+@media (max-width: 380px) {
+  .telemetry { grid-template-columns: repeat(2, 1fr); }
+  .telemetry-cell:nth-child(3n + 1) { box-shadow: inset 1px 0 0 var(--rule); }
+  .telemetry-cell:nth-child(2n + 1) { box-shadow: none; }
+  .masthead-title { font-size: 24px; }
+  .brand-mark { font-size: 20px; }
 }
