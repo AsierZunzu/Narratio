@@ -25,12 +25,22 @@ vi.mock('rss-parser', () => {
   const items: Array<Record<string, unknown>> = [];
   class Parser {
     static _items = items;
-    parseURL() {
+    parseString() {
       return Promise.resolve({ items });
     }
   }
   return { default: Parser };
 });
+
+// processFeed now fetches the feed XML itself; stub global fetch so tests
+// don't hit the network. The body is ignored because parseString is mocked.
+vi.stubGlobal('fetch', vi.fn(async () => ({
+  ok: true,
+  status: 200,
+  statusText: 'OK',
+  headers: new Headers({ 'content-type': 'application/rss+xml; charset=utf-8' }),
+  arrayBuffer: async () => new ArrayBuffer(0),
+})));
 
 vi.mock('../../src/services/tts.js', () => ({
   synthesise: vi.fn(),
