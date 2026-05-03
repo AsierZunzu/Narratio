@@ -341,7 +341,7 @@ body::before {
 
 .telemetry {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0;
   border: 1px solid var(--rule);
   border-radius: 0;
@@ -1141,6 +1141,23 @@ details.advanced .form-grid { padding: 16px; }
   .modal-body { padding: 18px 20px; }
   .modal-footer { padding: 14px 20px; }
   .modal-footer > div { width: 100%; justify-content: flex-end; }
+}
+
+/* Tablet & narrow desktop — telemetry to even 3×2, stack dispatch actions */
+@media (max-width: 960px) {
+  .telemetry { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .telemetry-cell:nth-child(3n + 1) { box-shadow: none; }
+
+  .dispatch {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 20px 2px;
+  }
+  .dispatch-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 /* Phone */
