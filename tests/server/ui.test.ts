@@ -352,7 +352,7 @@ describe('renderDashboard helper functions', () => {
     feed_id: 1,
     title: 'Test Article',
     link: 'https://x.com/1',
-    pub_date: '2024-01-15T00:00:00Z',
+    pub_date: new Date('2024-01-15T00:00:00Z'),
     content: '<p>Hello <b>world</b></p>',
     image_url: null,
     audio_file: 'g1.wav',

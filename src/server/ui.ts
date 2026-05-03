@@ -16,13 +16,11 @@ const STATUS_LABELS: Record<string, string> = {
   purged: 'Purged',
 };
 
-function formatDate(d: string | null): string {
+function formatDate(d: Date | string | null): string {
   if (!d) return '—';
-  try {
-    return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return d;
-  }
+  const date = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(date.getTime())) return typeof d === 'string' ? d : '—';
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function stripHtml(s: string): string {

@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS articles (
   feed_id         INTEGER REFERENCES feeds(id),
   title           TEXT NOT NULL,
   link            TEXT,
-  pub_date        TEXT,
+  pub_date        INTEGER,
   content         TEXT,
   image_url       TEXT,
   audio_file      TEXT,
@@ -72,6 +72,33 @@ CREATE TABLE IF NOT EXISTS articles (
 
 let _sqlite: Database.Database | null = null;
 let _db: Db | null = null;
+
+interface PragmaColumn { name: string; type: string }
+interface PubDateRow { guid: string; pub_date: string | number | null }
+
+function parsePubDateMs(raw: string | number | null): number | null {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  const ms = Date.parse(raw);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function migrateArticlesPubDateToInteger(sqlite: Database.Database): void {
+  const cols = sqlite.prepare('PRAGMA table_info(articles)').all() as PragmaColumn[];
+  const pubCol = cols.find((c) => c.name === 'pub_date');
+  if (!pubCol || pubCol.type.toUpperCase() === 'INTEGER') return;
+
+  const rows = sqlite.prepare('SELECT guid, pub_date FROM articles').all() as PubDateRow[];
+  const converted = rows.map((r) => ({ guid: r.guid, ms: parsePubDateMs(r.pub_date) }));
+
+  sqlite.transaction(() => {
+    sqlite.exec('ALTER TABLE articles RENAME COLUMN pub_date TO pub_date_old');
+    sqlite.exec('ALTER TABLE articles ADD COLUMN pub_date INTEGER');
+    const upd = sqlite.prepare('UPDATE articles SET pub_date = ? WHERE guid = ?');
+    for (const c of converted) upd.run(c.ms, c.guid);
+    sqlite.exec('ALTER TABLE articles DROP COLUMN pub_date_old');
+  })();
+}
 
 // Older rows stored RFC 2822 strings ("Mon, 02 May 2026 ...") which sort
 // lexicographically wrong. Rewrite anything that isn't already ISO 8601 UTC.
@@ -119,6 +146,7 @@ export function getDb(dbPath?: string): Db {
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE worker_state ADD COLUMN trigger_requested_at TEXT'); } catch { /* already exists */ }
+  migrateArticlesPubDateToInteger(_sqlite);
 
   normaliseLegacyPubDates(_sqlite);
   seedDefaultTtsService(_sqlite);

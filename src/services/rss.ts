@@ -42,16 +42,11 @@ const parser = new Parser<CustomFeed, CustomItem>({
   },
 });
 
-/**
- * Normalise a feed-item date to an ISO 8601 UTC string so lexicographic
- * ordering matches chronological ordering. Returns null for missing or
- * unparseable inputs.
- */
-export function normalisePubDate(input: string | undefined | null): string | null {
+export function normalisePubDate(input: string | undefined | null): Date | null {
   if (!input) return null;
   const t = Date.parse(input);
   if (Number.isNaN(t)) return null;
-  return new Date(t).toISOString();
+  return new Date(t);
 }
 
 function extractImageUrl(item: FeedItem): string | null {

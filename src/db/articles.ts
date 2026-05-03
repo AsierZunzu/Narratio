@@ -10,7 +10,7 @@ export interface InsertArticleParams {
   feed_id?: number | null;
   title: string;
   link: string | null;
-  pub_date: string | null;
+  pub_date: Date | null;
   content: string | null;
   image_url: string | null;
 }

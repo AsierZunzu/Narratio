@@ -26,7 +26,7 @@ function addDoneArticle(db: Db, audioDir: string, guid: string, sizeBytes: numbe
     feed_url: 'https://example.com/feed',
     title: `Article ${guid}`,
     link: null,
-    pub_date: pubDate,
+    pub_date: new Date(pubDate),
     content: null,
     image_url: null,
   });

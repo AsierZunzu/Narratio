@@ -31,7 +31,7 @@ const BASE_ARTICLE = {
   feed_url: 'https://example.com/feed',
   title: 'Test Article',
   link: 'https://example.com/article',
-  pub_date: '2026-01-01T00:00:00Z',
+  pub_date: new Date('2026-01-01T00:00:00Z'),
   content: 'Hello world',
   image_url: null,
 };
@@ -241,17 +241,17 @@ describe('getArticlesPage / getArticleStatusCounts', () => {
     const db = makeDb();
     // 5 pending, 3 done, 2 failed, 1 purged
     for (let i = 0; i < 5; i++) {
-      insertArticle(db, { guid: `p${i}`, feed_url: 'f', title: `Pending Apple ${i}`, link: null, pub_date: `2026-01-${String(10 + i).padStart(2, '0')}`, content: 'apple', image_url: null });
+      insertArticle(db, { guid: `p${i}`, feed_url: 'f', title: `Pending Apple ${i}`, link: null, pub_date: new Date(`2026-01-${String(10 + i).padStart(2, '0')}`), content: 'apple', image_url: null });
     }
     for (let i = 0; i < 3; i++) {
-      insertArticle(db, { guid: `d${i}`, feed_url: 'f', title: `Done Banana ${i}`, link: null, pub_date: `2026-02-${String(10 + i).padStart(2, '0')}`, content: 'banana', image_url: null });
+      insertArticle(db, { guid: `d${i}`, feed_url: 'f', title: `Done Banana ${i}`, link: null, pub_date: new Date(`2026-02-${String(10 + i).padStart(2, '0')}`), content: 'banana', image_url: null });
       markArticleDone(db, `d${i}`, `d${i}.wav`, 100);
     }
     for (let i = 0; i < 2; i++) {
-      insertArticle(db, { guid: `f${i}`, feed_url: 'f', title: `Failed ${i}`, link: null, pub_date: '2026-03-01', content: 'cherry', image_url: null });
+      insertArticle(db, { guid: `f${i}`, feed_url: 'f', title: `Failed ${i}`, link: null, pub_date: new Date('2026-03-01'), content: 'cherry', image_url: null });
       markArticleFailed(db, `f${i}`, 'err');
     }
-    insertArticle(db, { guid: 'pu1', feed_url: 'f', title: 'Purged Apple', link: null, pub_date: '2026-04-01', content: 'apple slice', image_url: null });
+    insertArticle(db, { guid: 'pu1', feed_url: 'f', title: 'Purged Apple', link: null, pub_date: new Date('2026-04-01'), content: 'apple slice', image_url: null });
     markArticlePurged(db, 'pu1');
     return db;
   }
