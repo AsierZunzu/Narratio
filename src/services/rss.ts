@@ -129,18 +129,48 @@ export async function processPendingArticles(db: Db, opts: TtsBatchOptions): Pro
   }
 }
 
+/**
+ * Fetch an RSS feed and decode it using the charset declared by the server
+ * (Content-Type header) or by the XML prolog. Falls back to UTF-8.
+ *
+ * Why: `rss-parser`'s `parseURL` decodes responses as UTF-8, which produces
+ * mojibake for feeds served as ISO-8859-1/15 or windows-1252 (e.g. AEMET).
+ */
+async function fetchFeedXml(url: string, timeoutMs: number): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  }
+  const buf = new Uint8Array(await res.arrayBuffer());
+  const headerCharset = /charset=([^;\s]+)/i.exec(res.headers.get('content-type') ?? '')?.[1];
+  const charset = headerCharset ?? sniffXmlEncoding(buf) ?? 'utf-8';
+  try {
+    return new TextDecoder(charset, { fatal: false }).decode(buf);
+  } catch {
+    return new TextDecoder('utf-8').decode(buf);
+  }
+}
+
+function sniffXmlEncoding(buf: Uint8Array): string | null {
+  // Read the XML prolog as ASCII (encoding name itself is always ASCII).
+  const head = new TextDecoder('utf-8', { fatal: false }).decode(buf.subarray(0, 256));
+  return /<\?xml[^?]*encoding=["']([^"']+)["']/i.exec(head)?.[1] ?? null;
+}
+
 export async function processFeed(db: Db, opts: RssServiceOptions): Promise<void> {
   logger.info(`Fetching RSS feed: ${opts.feedUrl}`);
 
-  let feed: Awaited<ReturnType<typeof parser.parseURL>>;
+  let feed: Awaited<ReturnType<typeof parser.parseString>>;
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), opts.fetchTimeoutMs);
-    try {
-      feed = await parser.parseURL(opts.feedUrl);
-    } finally {
-      clearTimeout(timer);
-    }
+    const xml = await fetchFeedXml(opts.feedUrl, opts.fetchTimeoutMs);
+    feed = await parser.parseString(xml);
   } catch (err) {
     throw new Error(`Failed to fetch RSS feed: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
