@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ejs from 'ejs';
@@ -7,6 +7,22 @@ import type { ArticleStatusCounts } from '../db/articles.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, 'templates');
+const ASSETS_DIR = join(__dirname, 'public');
+
+const ASSET_FILES = ['styles.css', 'app.js', 'library.js', 'feeds.js', 'voices.js'];
+
+const ASSETS_VERSION: string = (() => {
+  let latest = 0;
+  for (const name of ASSET_FILES) {
+    try {
+      const m = statSync(join(ASSETS_DIR, name)).mtimeMs;
+      if (m > latest) latest = m;
+    } catch {
+      /* asset missing in tests — ignore */
+    }
+  }
+  return Math.floor(latest || Date.now()).toString(36);
+})();
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
@@ -57,7 +73,7 @@ function readTemplate(name: string): string {
 
 function renderPage(opts: PageOptions): string {
   const layout = readTemplate('partials/layout.ejs');
-  return ejs.render(layout, opts, {
+  return ejs.render(layout, { ...opts, assetsVersion: ASSETS_VERSION }, {
     filename: join(TEMPLATES_DIR, 'partials', 'layout.ejs'),
     views: [TEMPLATES_DIR, join(TEMPLATES_DIR, 'partials')],
   });
