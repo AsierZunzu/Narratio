@@ -1010,6 +1010,14 @@ body::before {
 }
 .modal-footer > * { min-width: 0; }
 
+/* Feed form (modal body is inside the form element) */
+#feed-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* Forms */
 .form-grid {
   display: grid;
