@@ -6,6 +6,20 @@
 
 Self-hosted RSS-to-podcast. Fetches articles from any RSS feed, synthesises them into audio via [Piper TTS](https://github.com/rhasspy/piper), and serves a standards-compliant Podcast RSS feed that any podcast client (Pinepods, Pocket Casts, Overcast, etc.) can subscribe to.
 
+## Screenshots
+
+**Dashboard Home** — the main status page showing all articles across feeds with their processing status, actions, and search/filter controls:
+
+![Dashboard Home](docs/root-desktop.png)
+
+**Feeds Page** — manage your podcast feeds: configure RSS URLs, podcast metadata, iTunes categories, per-feed audio quotas, and bind each feed to a specific TTS service:
+
+![Feeds Page](docs/feeds-desktop.png)
+
+**Voices Page** — add, edit, and remove Piper TTS endpoints. Each TTS service stores its host, port, and voice name, and can be bound to one or more feeds:
+
+![Voices Page](docs/voices-desktop.png)
+
 ---
 
 ## How it works
