@@ -22,6 +22,7 @@ export interface InsertFeedParams {
   tts_failed_message?: string | null;
   max_audio_files?: number | null;
   max_audio_size_mb?: number | null;
+  image_file?: string | null;
   tts_service_id: number;
 }
 
@@ -59,11 +60,13 @@ export function countFeedsByTtsService(db: Db, ttsServiceId: number): number {
   return result?.count ?? 0;
 }
 
-export function deleteFeedWithArticles(db: Db, feedId: number): { audioFiles: string[]; articleCount: number } {
+export function deleteFeedWithArticles(db: Db, feedId: number): { audioFiles: string[]; articleCount: number; imageFile: string | null } {
   return db.transaction((tx) => {
+    const feed = tx.select({ image_file: feeds.image_file }).from(feeds).where(eq(feeds.id, feedId)).get();
+    const imageFile = feed?.image_file ?? null;
     const audioFiles = getAudioFilesByFeed(tx, feedId);
     const articleCount = deleteArticlesByFeed(tx, feedId);
     tx.delete(feeds).where(eq(feeds.id, feedId)).run();
-    return { audioFiles, articleCount };
+    return { audioFiles, articleCount, imageFile };
   });
 }
