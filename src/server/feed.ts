@@ -7,12 +7,14 @@ const TTS_FAILED_PREFIX = '[TTS FAILED]';
 
 export function buildFeedXml(db: Db, feed: Feed, baseUrl: string): string {
   const description = feed.description || `Narratio: ${feed.title}`;
+  const imageUrl = feed.image_file ? `${baseUrl}/feed-images/${encodeURIComponent(feed.image_file)}` : undefined;
 
   const podcast = new Podcast({
     title: feed.title,
     description,
     feedUrl: `${baseUrl}/rss/${feed.slug}`,
     siteUrl: baseUrl,
+    ...(imageUrl ? { imageUrl } : {}),
     author: feed.author,
     language: feed.language,
     generator: 'Narratio',
@@ -21,6 +23,7 @@ export function buildFeedXml(db: Db, feed: Feed, baseUrl: string): string {
     namespaces: { iTunes: true },
     itunesAuthor: feed.itunes_author ?? feed.author,
     itunesSummary: feed.itunes_summary ?? description,
+    ...(imageUrl ? { itunesImage: imageUrl } : {}),
     itunesOwner: {
       name: feed.itunes_owner_name ?? feed.author,
       email: feed.itunes_owner_email ?? 'worker@example.com',
