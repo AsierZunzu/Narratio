@@ -31,8 +31,44 @@
     } catch { /* silent */ }
   }
 
+  const imageInput = document.getElementById('f-image');
+  const imagePreview = document.getElementById('f-image-preview');
+  const imageRemoveBtn = document.getElementById('f-image-remove');
+  // Tracks per-modal-open state: whether the user clicked Remove on the existing image.
+  let imageRemovalRequested = false;
+
+  function setImagePreview(src) {
+    if (!imagePreview) return;
+    if (src) {
+      imagePreview.src = src;
+      imagePreview.hidden = false;
+      if (imageRemoveBtn) imageRemoveBtn.hidden = false;
+    } else {
+      imagePreview.removeAttribute('src');
+      imagePreview.hidden = true;
+      if (imageRemoveBtn) imageRemoveBtn.hidden = true;
+    }
+  }
+
+  imageInput?.addEventListener('change', () => {
+    const file = imageInput.files && imageInput.files[0];
+    if (!file) return;
+    imageRemovalRequested = false;
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result);
+    reader.readAsDataURL(file);
+  });
+
+  imageRemoveBtn?.addEventListener('click', () => {
+    imageRemovalRequested = true;
+    if (imageInput) imageInput.value = '';
+    setImagePreview('');
+  });
+
   function openFeedModal(feed) {
     form.reset();
+    imageRemovalRequested = false;
+    setImagePreview(feed && feed.image_file ? BASE_URL + '/feed-images/' + encodeURIComponent(feed.image_file) : '');
     refreshTtsDropdown(feed ? feed.tts_service_id : null);
     if (feed) {
       titleEl.textContent = 'Edit Feed';
@@ -60,25 +96,44 @@
     e.preventDefault();
     const id = idInput.value;
     const data = Object.fromEntries(new FormData(form).entries());
+    delete data['image']; // file goes via separate endpoint
     if (data['max_audio_files'] === '') delete data['max_audio_files'];
     else if (data['max_audio_files']) data['max_audio_files'] = Number(data['max_audio_files']);
     if (data['max_audio_size_mb'] === '') delete data['max_audio_size_mb'];
     else if (data['max_audio_size_mb']) data['max_audio_size_mb'] = Number(data['max_audio_size_mb']);
     data['tts_service_id'] = Number(data['tts_service_id']);
 
+    const imageFile = imageInput && imageInput.files && imageInput.files[0];
     const submitBtn = document.getElementById('feed-form-submit');
     submitBtn.disabled = true;
     try {
       const url = id ? '/api/feeds/' + encodeURIComponent(id) : '/api/feeds';
       const method = id ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (res.ok) {
-        N.showToast(id ? 'Feed updated' : 'Feed created', false);
-        N.closeModal('feed-modal');
-        setTimeout(() => window.location.reload(), 600);
-      } else {
+      if (!res.ok) {
         N.showToast(await res.text(), true);
+        return;
       }
+      const saved = await res.json();
+      const feedId = id || (saved && saved.id);
+
+      if (feedId && imageFile) {
+        const imgRes = await fetch('/api/feeds/' + encodeURIComponent(feedId) + '/image', {
+          method: 'POST',
+          headers: { 'Content-Type': imageFile.type },
+          body: imageFile,
+        });
+        if (!imgRes.ok) {
+          N.showToast('Feed saved, but image upload failed: ' + (await imgRes.text()), true);
+          return;
+        }
+      } else if (feedId && id && imageRemovalRequested) {
+        await fetch('/api/feeds/' + encodeURIComponent(feedId) + '/image', { method: 'DELETE' });
+      }
+
+      N.showToast(id ? 'Feed updated' : 'Feed created', false);
+      N.closeModal('feed-modal');
+      setTimeout(() => window.location.reload(), 600);
     } catch {
       N.showToast('Network error', true);
     } finally {

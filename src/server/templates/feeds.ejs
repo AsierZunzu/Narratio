@@ -23,6 +23,9 @@
       <% var tts = ttsServices.find(function(s) { return s.id === f.tts_service_id; }); %>
       <article class="card" data-feed-id="<%= f.id %>">
         <header class="card-header">
+          <% if (f.image_file) { %>
+            <img class="feed-card-image" src="<%= baseUrl %>/feed-images/<%= encodeURIComponent(f.image_file) %>" alt="">
+          <% } %>
           <div style="min-width:0">
             <div class="card-title"><%= f.name %></div>
             <div class="card-subtitle"><%= f.title %></div>
@@ -126,6 +129,17 @@
             <label for="f-max-size">Max audio size (MB)</label>
             <input id="f-max-size" name="max_audio_size_mb" type="number" min="1" placeholder="Unlimited">
             <span class="hint">Leave empty for no limit</span>
+          </div>
+          <div class="field full">
+            <label for="f-image">Cover image</label>
+            <div class="feed-image-row">
+              <img id="f-image-preview" alt="" class="feed-image-preview" hidden>
+              <input id="f-image" name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              <button type="button" class="btn btn-ghost btn-sm" id="f-image-remove" hidden data-tip="Remove the current image">
+                <span>Remove</span>
+              </button>
+            </div>
+            <span class="hint">PNG, JPEG, WebP or GIF — max 5&nbsp;MB. Used as the podcast artwork.</span>
           </div>
         </div>
 

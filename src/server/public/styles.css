@@ -852,6 +852,28 @@ body::before {
 }
 
 .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.feed-card-image {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  background: var(--surface-2, #f3f3f3);
+}
+.feed-image-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.feed-image-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-2, #f3f3f3);
+  border: 1px solid var(--border, #ddd);
+}
 .card-title {
   font-family: var(--serif);
   font-weight: 600;
