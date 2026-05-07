@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS feeds (
   tts_failed_message   TEXT,
   max_audio_files      INTEGER,
   max_audio_size_mb    INTEGER,
+  image_file           TEXT,
   tts_service_id       INTEGER NOT NULL REFERENCES tts_services(id),
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -146,6 +147,7 @@ export function getDb(dbPath?: string): Db {
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN tts_elapsed_ms INTEGER'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE articles ADD COLUMN feed_id INTEGER REFERENCES feeds(id)'); } catch { /* already exists */ }
   try { _sqlite.exec('ALTER TABLE worker_state ADD COLUMN trigger_requested_at TEXT'); } catch { /* already exists */ }
+  try { _sqlite.exec('ALTER TABLE feeds ADD COLUMN image_file TEXT'); } catch { /* already exists */ }
   migrateArticlesPubDateToInteger(_sqlite);
 
   normaliseLegacyPubDates(_sqlite);

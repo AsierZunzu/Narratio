@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS feeds (
   tts_failed_message   TEXT,
   max_audio_files      INTEGER,
   max_audio_size_mb    INTEGER,
+  image_file           TEXT,
   tts_service_id       INTEGER NOT NULL,
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );

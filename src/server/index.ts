@@ -40,9 +40,18 @@ import { logger } from '../utils/logger.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
+const IMAGES_DIR = path.join(DATA_DIR, 'images');
 const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const ASSETS_DIR = path.join(__dirname, 'public');
+
+const IMAGE_MIME_EXT: Record<string, string> = {
+  'image/png':  'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif':  'gif',
+};
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 async function ensureFeedFallbackAudio(
   audioDir: string,
@@ -92,15 +101,18 @@ function getBaseUrl(req: express.Request): string {
   return env.BASE_URL() ?? `${req.protocol}://${req.get('host')}`;
 }
 
-export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Application {
+export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR, imagesDir = IMAGES_DIR): express.Application {
   const app = express();
   const db = getDb(dbPath);
   const audioRoot = path.resolve(audioDir);
+  const imagesRoot = path.resolve(imagesDir);
+  fs.mkdirSync(imagesRoot, { recursive: true });
 
   app.set('trust proxy', true);
   app.use(express.json());
   app.use(express.static(PUBLIC_DIR));
   app.use('/assets', express.static(ASSETS_DIR, { maxAge: '1h', immutable: false }));
+  app.use('/feed-images', express.static(imagesRoot, { maxAge: '1h', immutable: false, dotfiles: 'ignore' }));
 
   app.get('/audio/:file', async (req, res) => {
     const filename = req.params['file'];
@@ -438,7 +450,7 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
       return;
     }
 
-    const { audioFiles, articleCount } = deleteFeedWithArticles(db, id);
+    const { audioFiles, articleCount, imageFile } = deleteFeedWithArticles(db, id);
 
     for (const filename of audioFiles) {
       const filePath = path.join(audioDir, filename);
@@ -454,7 +466,75 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR): express.Appli
       }
     }
 
-    logger.info(`Deleted feed ${id} with ${articleCount} article(s) and ${audioFiles.length} audio file(s)`);
+    if (imageFile) {
+      const imagePath = path.join(imagesRoot, imageFile);
+      try {
+        fs.unlinkSync(imagePath);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code;
+        if (code !== 'ENOENT') {
+          logger.warn(`Failed to unlink feed image ${imageFile}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+
+    logger.info(`Deleted feed ${id} with ${articleCount} article(s), ${audioFiles.length} audio file(s)${imageFile ? ', and 1 image' : ''}`);
+    res.status(204).end();
+  });
+
+  // Image upload — raw body, single image. Replaces any previous image for the feed.
+  app.post(
+    '/api/feeds/:id/image',
+    express.raw({ type: Object.keys(IMAGE_MIME_EXT), limit: IMAGE_MAX_BYTES }),
+    (req, res) => {
+      const id = Number(req.params['id']);
+      const feed = getFeedById(db, id);
+      if (!feed) {
+        res.status(404).send('Feed not found');
+        return;
+      }
+
+      const contentType = String(req.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+      const ext = IMAGE_MIME_EXT[contentType];
+      if (!ext) {
+        res.status(415).send('Unsupported image type. Use PNG, JPEG, WebP, or GIF.');
+        return;
+      }
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        res.status(400).send('Empty image body');
+        return;
+      }
+
+      if (feed.image_file && feed.image_file !== `feed-${id}.${ext}`) {
+        const prev = path.join(imagesRoot, feed.image_file);
+        try { fs.unlinkSync(prev); } catch { /* ignore */ }
+      }
+
+      const filename = `feed-${id}.${ext}`;
+      try {
+        fs.writeFileSync(path.join(imagesRoot, filename), req.body);
+      } catch (err) {
+        logger.error(`Failed to write feed image ${filename}`, err);
+        res.status(500).send('Failed to save image');
+        return;
+      }
+
+      const updated = updateFeed(db, id, { image_file: filename });
+      res.json({ image_file: filename, feed: updated });
+    },
+  );
+
+  app.delete('/api/feeds/:id/image', (req, res) => {
+    const id = Number(req.params['id']);
+    const feed = getFeedById(db, id);
+    if (!feed) {
+      res.status(404).send('Feed not found');
+      return;
+    }
+    if (feed.image_file) {
+      try { fs.unlinkSync(path.join(imagesRoot, feed.image_file)); } catch { /* ignore */ }
+      updateFeed(db, id, { image_file: null });
+    }
     res.status(204).end();
   });
 

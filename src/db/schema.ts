@@ -28,6 +28,7 @@ export const feeds = sqliteTable('feeds', {
   tts_failed_message:  text('tts_failed_message'),
   max_audio_files:     integer('max_audio_files'),
   max_audio_size_mb:   integer('max_audio_size_mb'),
+  image_file:          text('image_file'),
   tts_service_id:      integer('tts_service_id').notNull(),
   created_at:          text('created_at').notNull().default(sql`(datetime('now'))`),
 });
