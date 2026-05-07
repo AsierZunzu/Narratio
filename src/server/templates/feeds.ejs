@@ -134,7 +134,18 @@
             <label for="f-image">Cover image</label>
             <div class="feed-image-row">
               <img id="f-image-preview" alt="" class="feed-image-preview" hidden>
-              <input id="f-image" name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              <div class="file-input-wrapper">
+                <label class="file-input-label" for="f-image">
+                  <svg class="file-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="1.5"/>
+                    <circle cx="9" cy="10" r="1.6"/>
+                    <path d="M3.5 17 9 12.5l4.5 4 3-2.5L20.5 17"/>
+                  </svg>
+                  <span class="file-text">Choose cover image</span>
+                  <span class="file-name" id="f-file-name" hidden></span>
+                </label>
+                <input id="f-image" name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              </div>
               <button type="button" class="btn btn-ghost btn-sm" id="f-image-remove" hidden data-tip="Remove the current image">
                 <span>Remove</span>
               </button>
