@@ -34,6 +34,8 @@
   const imageInput = document.getElementById('f-image');
   const imagePreview = document.getElementById('f-image-preview');
   const imageRemoveBtn = document.getElementById('f-image-remove');
+  const fileNameEl = document.getElementById('f-file-name');
+  const fileTextEl = document.querySelector('.file-input-label .file-text');
   // Tracks per-modal-open state: whether the user clicked Remove on the existing image.
   let imageRemovalRequested = false;
 
@@ -50,10 +52,23 @@
     }
   }
 
+  function updateFileName(name) {
+    if (!fileNameEl || !fileTextEl) return;
+    if (name) {
+      fileNameEl.textContent = name;
+      fileNameEl.hidden = false;
+      fileTextEl.hidden = true;
+    } else {
+      fileNameEl.hidden = true;
+      fileTextEl.hidden = false;
+    }
+  }
+
   imageInput?.addEventListener('change', () => {
     const file = imageInput.files && imageInput.files[0];
     if (!file) return;
     imageRemovalRequested = false;
+    updateFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
@@ -62,12 +77,14 @@
   imageRemoveBtn?.addEventListener('click', () => {
     imageRemovalRequested = true;
     if (imageInput) imageInput.value = '';
+    updateFileName('');
     setImagePreview('');
   });
 
   function openFeedModal(feed) {
     form.reset();
     imageRemovalRequested = false;
+    updateFileName('');
     setImagePreview(feed && feed.image_file ? BASE_URL + '/feed-images/' + encodeURIComponent(feed.image_file) : '');
     refreshTtsDropdown(feed ? feed.tts_service_id : null);
     if (feed) {
