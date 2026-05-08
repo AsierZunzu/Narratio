@@ -180,11 +180,6 @@ export function createApp(dbPath = DB_PATH, audioDir = AUDIO_DIR, imagesDir = IM
         res.status(500).send('TTS service not configured');
         return;
       }
-      ensureFeedFallbackAudio(
-        audioDir, feed.id, ttsService.host, ttsService.port,
-        feed.unavailable_message ?? env.UNAVAILABLE_MESSAGE(),
-        feed.tts_failed_message ?? env.TTS_FAILED_MESSAGE(),
-      ).catch((err) => logger.warn(`Lazy fallback audio failed: ${err instanceof Error ? err.message : String(err)}`));
       const xml = buildFeedXml(db, feed, baseUrl);
       res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
       res.send(xml);
