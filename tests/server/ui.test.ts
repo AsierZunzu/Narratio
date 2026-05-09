@@ -334,14 +334,30 @@ describe('GET /rss/:slug', () => {
     resetDb();
     const { db, dbPath } = makeTempDb();
     const tts = insertTtsService(db, { name: 'T', host: 'localhost', port: 10200 });
-    insertFeed(db, { name: 'F', rss_url: 'https://x.com/rss', slug: 'my-podcast', title: 'My Podcast', tts_service_id: tts.id });
+    const feed = insertFeed(db, { name: 'F', rss_url: 'https://x.com/rss', slug: 'my-podcast', title: 'My Podcast', tts_service_id: tts.id });
     db.$client.close();
 
-    const app = createApp(dbPath);
-    const res = await request(app).get('/rss/my-podcast');
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toMatch(/application\/rss\+xml/);
-    expect(res.text).toContain('<rss');
+    // Pre-seed fallback WAVs so that if lazy fallback generation is ever
+    // reintroduced it short-circuits before attempting a TCP connection to the
+    // (nonexistent) TTS server, which would fire async logger calls after the
+    // test has finished and cause an EnvironmentTeardownError.
+    const audioDir = path.join(process.cwd(), 'data', 'audio');
+    fs.mkdirSync(audioDir, { recursive: true });
+    const unavailableWav = path.join(audioDir, `unavailable-${feed.id}.wav`);
+    const ttsFailedWav = path.join(audioDir, `tts-failed-${feed.id}.wav`);
+    try {
+      fs.writeFileSync(unavailableWav, Buffer.from('RIFFxxxxWAVEdata'));
+      fs.writeFileSync(ttsFailedWav, Buffer.from('RIFFxxxxWAVEdata'));
+
+      const app = createApp(dbPath);
+      const res = await request(app).get('/rss/my-podcast');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toMatch(/application\/rss\+xml/);
+      expect(res.text).toContain('<rss');
+    } finally {
+      try { fs.unlinkSync(unavailableWav); } catch { /* ignore */ }
+      try { fs.unlinkSync(ttsFailedWav); } catch { /* ignore */ }
+    }
   });
 });
 
