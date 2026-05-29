@@ -21,7 +21,7 @@
     "better-sqlite3": "^12.9.0",
     "cron-parser": "^5.5.0",
     "drizzle-orm": "^0.45.2",
-    "ejs": "^5.0.2",
+    "ejs": "^6.0.1",
     "express": "^5.2.1",
     "html-to-text": "^10.0.0",
     "node-cron": "^4.2.1",
