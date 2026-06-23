@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import cron, { type ScheduledTask } from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { getDb, closeDb, resetDb } from '../db/index.js';
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
   const pollInterval = env.POLL_INTERVAL();
 
   let shuttingDown = false;
-  const cronTasks: cron.ScheduledTask[] = [];
+  const cronTasks: ScheduledTask[] = [];
   const intervalTimers: NodeJS.Timeout[] = [];
 
   const shutdown = () => {
