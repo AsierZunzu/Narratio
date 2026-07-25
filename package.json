@@ -4,6 +4,9 @@
   "description": "Self-hosted RSS-to-podcast with AI-generated audio",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
   "scripts": {
     "build": "tsc && cp -r src/server/templates dist/server/ && cp -r src/server/public dist/server/",
     "test": "vitest run",
