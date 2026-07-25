@@ -206,7 +206,7 @@ Both volumes are mounted from `./data` on the host.
 
 ## Development
 
-**Requirements:** Node.js 22+, npm
+**Requirements:** Node.js 26+, npm
 
 ```bash
 npm install
