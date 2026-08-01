@@ -42,7 +42,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "ejs-lint": "^2.0.1",
     "eslint": "^10.8.0",
-    "globals": "^17.7.0",
+    "globals": "^17.8.0",
     "playwright": "^1.62.0",
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
