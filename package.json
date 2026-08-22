@@ -39,7 +39,7 @@
     "@types/html-to-text": "^9.0.4",
     "@types/node": "^26.2.0",
     "@types/supertest": "^7.2.1",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "ejs-lint": "^2.0.1",
     "eslint": "^10.8.1",
     "globals": "^17.8.0",
