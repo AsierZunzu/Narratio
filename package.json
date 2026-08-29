@@ -20,7 +20,7 @@
     "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
-    "@extractus/article-extractor": "^8.1.0",
+    "@extractus/article-extractor": "^9.0.1",
     "better-sqlite3": "^13.0.3",
     "cron-parser": "^5.10.0",
     "drizzle-orm": "^0.45.2",
