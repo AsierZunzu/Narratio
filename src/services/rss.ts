@@ -2,6 +2,7 @@ import Parser from 'rss-parser';
 import type { Db } from '../db/index.js';
 import { extract } from '@extractus/article-extractor';
 import { htmlToText } from '../utils/html.js';
+import { normalizeForSpeech } from '../utils/speech.js';
 import { logger } from '../utils/logger.js';
 import {
   insertArticle,
@@ -146,6 +147,7 @@ async function fetchFullContent(url: string, timeoutMs: number): Promise<string 
 
 export interface TtsBatchOptions {
   feedId: number;
+  language: string;
   maxRetries: number;
   tts: TtsOptions;
   audioDir: string;
@@ -285,7 +287,7 @@ async function dispatchTts(
   opts: TtsBatchOptions,
 ): Promise<void> {
   const rawText = [title, content].filter(Boolean).join("\n");
-  let text = sanitiseText(rawText);
+  let text = normalizeForSpeech(sanitiseText(rawText), opts.language);
 
   if (text.length === 0) {
     logger.warn(`Skipping TTS for "${title}" — no usable text after sanitisation`);

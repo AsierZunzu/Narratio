@@ -20,6 +20,7 @@ const DB_PATH = path.join(DATA_DIR, 'narratio.db');
 function buildTtsOpts(feed: Feed, ttsService: TtsService) {
   return {
     feedId: feed.id,
+    language: feed.language,
     maxRetries: env.TTS_MAX_RETRIES(),
     tts: {
       host: ttsService.host,

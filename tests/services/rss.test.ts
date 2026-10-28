@@ -63,6 +63,7 @@ describe('processFeed', () => {
 
   const baseOpts = () => ({
     feedId: 1,
+    language: 'en',
     feedUrl: 'https://example.com/feed',
     fetchTimeoutMs: 5000,
     maxRetries: 3,
