@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@extractus/article-extractor": "^9.0.1",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^13.2.0",
     "cron-parser": "^5.10.6",
     "drizzle-orm": "^0.45.4",
     "ejs": "^7.0.2",
